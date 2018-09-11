@@ -1,0 +1,145 @@
+import threading
+import numpy as np
+import pandas as pd
+import zmq
+import time
+import msgpack
+import logging
+
+logger = logging.getLogger(__name__)
+
+T_PUPIL = 't_pupil'
+T_SYS_REL = 't_sys_rel'
+T_SYS_ABS = 't_sys_abs'
+NORM_X = 'norm_x'
+NORM_Y = 'norm_y'
+NORM_Z = 'norm_z'
+CONFIDENCE = 'confidence'
+
+
+class PupilThread(threading.Thread):
+
+    address = '127.0.0.1'
+    request_port = '50020'
+
+    last_sync_time = None
+
+    buffer_length = 120 * 60 * 10  # standard number of time steps in buffer
+    sample_size = 7  # pupil time, system time corrected, system time, gaze normal x, y, z, confidence
+    sample_components = [T_PUPIL, T_SYS_REL, T_SYS_ABS, NORM_X, NORM_Y, NORM_Z, CONFIDENCE]
+
+    data = None
+    i_current_sample = 0
+    buffer_limit_reached = False
+
+    def __init__(self):
+        super(PupilThread, self).__init__()
+        self.context = zmq.Context()
+
+        # open a request socket for general communication
+        logger.info('Opening a request socket to pupil service. If this hangs, check that pupil service is running.')
+        self.request_socket = self.context.socket(zmq.REQ)
+        self.request_socket.connect("tcp://{}:{}".format(self.address, self.request_port))
+        logger.info('Request socket connected.')
+
+        # ask for the sub port
+        self.request_socket.send_string('SUB_PORT')
+        self.sub_port = self.request_socket.recv_string()
+
+        self.sub_socket = self.context.socket(zmq.SUB)
+
+        # define thread synchronization events
+        self.should_stop = threading.Event()
+
+        # set the pupil timer to 0
+        self.synchronize_time()
+
+    def run(self):
+
+        self.reset_data_buffer()
+
+        # listen to pupil data on the sub port
+        logger.info('Connecting subscription socket and subscribing to pupil data...')
+        self.sub_socket.connect("tcp://{}:{}".format(self.address, self.sub_port))
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, 'pupil.')
+        logger.info('Success.')
+
+        while not self.should_stop.is_set():
+
+            if self.i_current_sample == self.buffer_length - 1:
+                self.buffer_limit_reached = True
+                logger.warning('Buffer limit reached, all samples until reset will be lost.')
+
+            # receive samples even if buffer limit reached, so the socket doesn't fill up
+            try:
+                topic = self.sub_socket.recv_string()
+                message = self.sub_socket.recv()
+            except KeyboardInterrupt:
+                logger.warning('Keyboard Interrupt detected, closing...')
+                break
+
+            system_time_received = time.perf_counter()
+
+            if not self.buffer_limit_reached:
+                msg = msgpack.loads(message, encoding='utf-8')
+                self.data[T_PUPIL][self.i_current_sample] = msg['timestamp']
+                self.data[T_SYS_REL][self.i_current_sample]= system_time_received - self.last_sync_time
+                self.data[T_SYS_ABS][self.i_current_sample] = system_time_received
+                self.data[NORM_X][self.i_current_sample] = msg['circle_3d']['normal'][0]
+                self.data[NORM_Y][self.i_current_sample] = msg['circle_3d']['normal'][1]
+                self.data[NORM_Z][self.i_current_sample] = msg['circle_3d']['normal'][2]
+                self.data[CONFIDENCE][self.i_current_sample] = msg['confidence']
+
+            self.i_current_sample += 1
+
+        # after loop, close sockets and context
+        self.cleanup()
+
+    def synchronize_time(self, t="0.0"):
+        logger.info('Sending pupil sync signal for T= ' + t + '.')
+        self.request_socket.send_string('T ' + t)
+        self.last_sync_time = time.perf_counter()
+        self.request_socket.recv_string()
+        logger.info('Sync successful.')
+
+    def reset_data_buffer(self):
+        data_array = np.full((self.buffer_length, self.sample_size), np.nan, dtype=np.float)
+        self.data = pd.DataFrame(data=data_array, columns=self.sample_components)
+        self.i_current_sample = 0
+        self.buffer_limit_reached = False
+
+    def cleanup(self):
+        self.request_socket.close()
+        self.sub_socket.close()
+        self.context.term()
+        logger.info('ZMQ context terminated gracefully.')
+
+    def get_shortened_data(self):
+        if self.data is None:
+            return None
+        # check if data has been written to the last sample of the row
+        # otherwise we're currently filling this time step and return the last complete
+        if self.data.iloc[self.i_current_sample, -1] == np.nan:
+            return self.data.iloc[0:self.i_current_sample - 1, :]
+        else:
+            return self.data.iloc[0:self.i_current_sample, :]
+
+    def get_last_sample(self):
+        if self.data is None:
+            return None
+        # check if data has been written to the last sample of the row
+        # otherwise we're currently filling this time step and return the last complete
+        if self.data.iloc[self.i_current_sample, -1] == np.nan:
+            return self.data.iloc[self.i_current_sample - 1, :]
+        else:
+            return self.data.iloc[self.i_current_sample, :]
+
+    def get_last_angular_velocity(self):
+        n_samples = self.i_current_sample
+        if n_samples > 1:
+            angular_velocity = np.rad2deg(np.arccos(np.dot(
+                self.data.values[n_samples - 1, 3:6],
+                self.data.values[n_samples - 2, 3:6]))) * 120
+            return angular_velocity
+        else:
+            return 0
