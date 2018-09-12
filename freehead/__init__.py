@@ -7,6 +7,8 @@ from .u_theta import u_theta
 from .yawpitchroll import yawpitchroll
 from .get_rig_transform import get_rig_transform
 from .constants import LED_POSITIONS, FOUR_MARKER_PROBE
+from .to_unit import to_unit
+from .markers_to_ortho import markers_to_ortho
 
 root = logging.getLogger('freehead')
 if not root.handlers:
