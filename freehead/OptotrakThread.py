@@ -125,6 +125,9 @@ class OptotrakThread(threading.Thread):
 
         self.should_stop = threading.Event()
         self.started_running = threading.Event()
+        self.recording_allowed = threading.Event()
+        self.requesting_data_reset = threading.Event()
+        self.reset_request_received = threading.Event()
 
     def run(self):
 
@@ -139,6 +142,12 @@ class OptotrakThread(threading.Thread):
         self.started_running.set()
 
         while not self.should_stop.is_set():
+
+            if self.requesting_data_reset.is_set():
+                self.reset_request_received.set()
+                logger.info('Waiting for recording allowance')
+                self.recording_allowed.wait()
+                logger.info('Recording allowance received. Continuing.')
 
             if self.i_current_sample == self.buffer_length - 1:
                 self.buffer_limit_reached = True
@@ -161,10 +170,23 @@ class OptotrakThread(threading.Thread):
         self.cleanup()
 
     def reset_data_buffer(self):
+
+        if self.started_running.is_set():
+            self.recording_allowed.clear()
+            self.requesting_data_reset.set()
+            logger.info('Waiting for reset request received signal.')
+            self.reset_request_received.wait()
+            # now the data gathering loop should wait for allowance, the data array can be reset
+
         data_array = np.full((self.buffer_length, self.sample_size), np.nan, dtype=np.float)
         self.data = data_array
         self.i_current_sample = 0
         self.buffer_limit_reached = False
+        logger.info('Successfully reset data array.')
+
+        self.reset_request_received.clear()
+        self.requesting_data_reset.clear()
+        self.recording_allowed.set()
 
 
     def create_data_inlet(self):
@@ -210,7 +232,14 @@ class OptotrakThread(threading.Thread):
             return self.data[self.i_current_sample, :]
 
     def cleanup(self):
+        logger.info('Pushing stop code to Optotrak server.')
         self.control_outlet.push_sample([self.client_config['lsl']['stop_code']])
+        logger.info('Deleting config outlet.')
+        del self.config_outlet
+        logger.info('Deleting control outlet.')
+        del self.control_outlet
+        logger.info('Deleting data inlet.')
+        del self.data_inlet
 
 def padded_lsl_string(string):
     return '<<STRT>>' + string + '<<STOP>>'
