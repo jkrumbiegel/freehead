@@ -2,6 +2,7 @@ import logging
 import sys
 from .PupilThread import PupilThread
 from .OptotrakThread import OptotrakThread
+from .wait_for_keypress import wait_for_keypress
 
 
 root = logging.getLogger('freehead')
