@@ -30,6 +30,7 @@ class PupilThread(threading.Thread):
 
     data = None
     i_current_sample = 0
+    current_sample = None
     buffer_limit_reached = False
 
     def __init__(self):
@@ -74,6 +75,17 @@ class PupilThread(threading.Thread):
             try:
                 topic = self.sub_socket.recv_string()
                 message = self.sub_socket.recv()
+                system_time_received = time.monotonic()
+                msg = msgpack.loads(message, encoding='utf-8')
+                self.current_sample = np.array([
+                    msg['timestamp'],
+                    system_time_received - self.last_sync_time,
+                    system_time_received,
+                    msg['circle_3d']['normal'][0],
+                    msg['circle_3d']['normal'][1],
+                    msg['circle_3d']['normal'][2],
+                    msg['confidence']
+                ])
             except KeyboardInterrupt:
                 logger.warning('Keyboard Interrupt detected, closing...')
                 break
@@ -81,14 +93,8 @@ class PupilThread(threading.Thread):
             system_time_received = time.perf_counter()
 
             if not self.buffer_limit_reached:
-                msg = msgpack.loads(message, encoding='utf-8')
-                self.data[T_PUPIL][self.i_current_sample] = msg['timestamp']
-                self.data[T_SYS_REL][self.i_current_sample]= system_time_received - self.last_sync_time
-                self.data[T_SYS_ABS][self.i_current_sample] = system_time_received
-                self.data[NORM_X][self.i_current_sample] = msg['circle_3d']['normal'][0]
-                self.data[NORM_Y][self.i_current_sample] = msg['circle_3d']['normal'][1]
-                self.data[NORM_Z][self.i_current_sample] = msg['circle_3d']['normal'][2]
-                self.data[CONFIDENCE][self.i_current_sample] = msg['confidence']
+                self.data[self.i_current_sample, :] = self.current_sample
+
 
             self.i_current_sample += 1
 
@@ -104,7 +110,7 @@ class PupilThread(threading.Thread):
 
     def reset_data_buffer(self):
         data_array = np.full((self.buffer_length, self.sample_size), np.nan, dtype=np.float)
-        self.data = pd.DataFrame(data=data_array, columns=self.sample_components)
+        self.data = data_array
         self.i_current_sample = 0
         self.buffer_limit_reached = False
 
@@ -119,20 +125,10 @@ class PupilThread(threading.Thread):
             return None
         # check if data has been written to the last sample of the row
         # otherwise we're currently filling this time step and return the last complete
-        if self.data.iloc[self.i_current_sample, -1] == np.nan:
-            return self.data.iloc[0:self.i_current_sample - 1, :]
+        if self.data[self.i_current_sample, -1] == np.nan:
+            return self.data[0:self.i_current_sample - 1, :]
         else:
-            return self.data.iloc[0:self.i_current_sample, :]
-
-    def get_last_sample(self):
-        if self.data is None:
-            return None
-        # check if data has been written to the last sample of the row
-        # otherwise we're currently filling this time step and return the last complete
-        if self.data.iloc[self.i_current_sample, -1] == np.nan:
-            return self.data.iloc[self.i_current_sample - 1, :]
-        else:
-            return self.data.iloc[self.i_current_sample, :]
+            return self.data[0:self.i_current_sample, :]
 
     def get_last_angular_velocity(self):
         n_samples = self.i_current_sample

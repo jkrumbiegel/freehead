@@ -155,15 +155,17 @@ class OptotrakThread(threading.Thread):
 
             # receive samples even if buffer limit reached, so the socket doesn't fill up
             try:
-                self.current_sample, self.current_timestamp = self.data_inlet.pull_sample()
-                self.current_timestamp += self.data_inlet.time_correction();
+                current_data, current_timestamp = self.data_inlet.pull_sample()
+                current_data = np.array(current_data)
+                current_data[current_data < -3.6e+28] = np.nan
+                current_timestamp += self.data_inlet.time_correction();
+                self.current_sample = np.concatenate((current_data, [current_timestamp]))
             except KeyboardInterrupt:
                 logger.warning('Keyboard Interrupt detected, closing...')
                 break
 
             if not self.buffer_limit_reached:
-                self.data[self.i_current_sample, 0 : self.sample_size - 1] = self.current_sample
-                self.data[self.i_current_sample, self.sample_size - 1] = self.current_timestamp
+                self.data[self.i_current_sample, :] = self.current_sample
 
             self.i_current_sample += 1
 
@@ -217,19 +219,9 @@ class OptotrakThread(threading.Thread):
         # check if data has been written to the last sample of the row
         # otherwise we're currently filling this time step and return the last complete
         if self.data[self.i_current_sample, -1] == np.nan:
-            return self.data[0:self.i_current_sample - 1, :]
-        else:
             return self.data[0:self.i_current_sample, :]
-
-    def get_last_sample(self):
-        if self.data is None:
-            return None
-        # check if data has been written to the last sample of the row
-        # otherwise we're currently filling this time step and return the last complete
-        if self.data[self.i_current_sample, -1] == np.nan:
-            return self.data[self.i_current_sample - 1, :]
         else:
-            return self.data[self.i_current_sample, :]
+            return self.data[0:self.i_current_sample + 1, :]
 
     def cleanup(self):
         logger.info('Pushing stop code to Optotrak server.')

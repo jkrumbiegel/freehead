@@ -9,6 +9,8 @@ from .get_rig_transform import get_rig_transform
 from .constants import LED_POSITIONS, FOUR_MARKER_PROBE
 from .to_unit import to_unit
 from .markers_to_ortho import markers_to_ortho
+from .calibrate_pupil import calibrate_pupil
+from .rigidbody import Rigidbody
 
 root = logging.getLogger('freehead')
 if not root.handlers:

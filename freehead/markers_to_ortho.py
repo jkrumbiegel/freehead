@@ -2,14 +2,20 @@ import numpy as np
 import freehead
 
 
-def markers_to_ortho(
-        marker1: np.ndarray,
-        marker2: np.ndarray,
-        marker3: np.ndarray
-):
-    marker1 = marker1.squeeze()
-    marker2 = marker2.squeeze()
-    marker3 = marker3.squeeze()
+def markers_to_ortho(*markers):
+
+    if len(markers) == 1:
+        marker1 = markers[0][..., 0:3]
+        marker2 = markers[0][..., 3:6]
+        marker3 = markers[0][..., 6:9]
+
+    elif len(markers) == 3:
+        marker1 = markers[0]
+        marker2 = markers[1]
+        marker3 = markers[2]
+
+    else:
+        raise Exception('Input must be either three marker arrays with 3 coordinates or one array with 9.')
 
     side1 = freehead.to_unit(marker2 - marker1)
     side2 = freehead.to_unit(marker3 - marker1)
