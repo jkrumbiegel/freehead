@@ -13,6 +13,7 @@ from .markers_to_ortho import markers_to_ortho
 from .calibrate_pupil import calibrate_pupil
 from .rigidbody import Rigidbody
 from .is_rotation_matrix import is_rotation_matrix
+from .tup3d import tup3d
 
 root = logging.getLogger('freehead')
 if not root.handlers:
