@@ -9,7 +9,7 @@ def get_rig_transform(probe_tips, indices, in_degrees=True):
     def err_func(parameters):
         ypr = parameters[0:3]
         T_leds = parameters[3:6]
-        R_leds = freehead.yawpitchroll(ypr, in_degrees=in_degrees)
+        R_leds = freehead.from_yawpitchroll(ypr, in_degrees=in_degrees)
         # apply inverse transform
         calculated_positions = np.einsum('ij,tj->ti', np.linalg.pinv(R_leds), probe_tips - T_leds)
         position_error = np.sum((calculated_positions - probed_leds) ** 2)

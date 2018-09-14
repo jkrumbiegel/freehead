@@ -2,7 +2,7 @@ import freehead
 import numpy as np
 
 
-def yawpitchroll(*args, in_degrees=True):
+def from_yawpitchroll(*args, in_degrees=True):
 
     if len(args) == 1:
         ypr = args[0]

@@ -6,7 +6,7 @@ import freehead as fh
 def calibrate_pupil(T_head_world, R_head_world, gaze_normals, T_target_world, ini_T_eye_head=np.zeros(3), bounds_mm=np.inf):
 
     def err_func(parameters):
-        R_eye_head = fh.yawpitchroll(parameters[0:3])
+        R_eye_head = fh.from_yawpitchroll(parameters[0:3])
         T_eye_head = parameters[3:6]
 
         T_eye_world = np.einsum('tij,j->ti', R_head_world, T_eye_head) + T_head_world
