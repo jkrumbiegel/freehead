@@ -3,7 +3,7 @@ import freehead
 import warnings
 
 
-def to_yawpitchroll(R):
+def _to_yawpitchroll_single(R, in_degrees):
     if not freehead.is_rotation_matrix(R):
         if np.any(np.isnan(R)):
             warnings.warn('Rotation matrix contains nan, result replaced with nan')
@@ -24,16 +24,16 @@ def to_yawpitchroll(R):
         pitch = np.arctan2(-R[2, 0], sy)
         yaw = 0
 
-    return np.array([yaw, pitch, roll])
+    return np.array([yaw, pitch, roll]) if not in_degrees else np.rad2deg(np.array([yaw, pitch, roll]))
 
 
-def matrices_to_euler(R):
+def to_yawpitchroll(R, in_degrees=True):
     if len(R.shape) == 2:
-        return to_yawpitchroll(R)
+        return _to_yawpitchroll_single(R, in_degrees=in_degrees)
 
     if len(R.shape) == 3:
         euler = np.empty((R.shape[0], 3), np.float)
         for i in range(R.shape[0]):
-            euler[i, :] = to_yawpitchroll(R[i, ...].squeeze())
+            euler[i, :] = _to_yawpitchroll_single(R[i, ...].squeeze(),  in_degrees=in_degrees)
 
         return euler
