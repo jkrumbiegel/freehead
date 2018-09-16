@@ -22,32 +22,10 @@ class Rigidbody:
 
     def solve(self, markers):
         if markers.ndim == 2:
-            return self._solve_single(markers)
+            rotation, ref_points = self._solve_multiple(markers[None, :, :])
+            return rotation.reshape((3, 3)), ref_points.reshape((-1, 3))
         elif markers.ndim == 3:
             return self._solve_multiple(markers)
-
-    def _solve_single(self, markers):
-        # if fewer than three markers are available, procrustes can't work
-        valid_marker_rows = ~np.any(np.isnan(markers), axis=1)
-        if np.sum(valid_marker_rows) < 3:
-            return np.full((3, 3), np.nan), np.full((3, ), np.nan)
-
-        valid_markers = markers[valid_marker_rows, :]
-        reference_subset = self.reference_markers[valid_marker_rows, :]
-
-        valid_markers_centroid = valid_markers.mean(axis=0)
-        valid_markers_centered = valid_markers - valid_markers_centroid
-
-        reference_subset_centroid = reference_subset.mean(axis=0)
-        reference_subset_centered = reference_subset - reference_subset_centroid
-
-        ref_center_to_ref_points = self.ref_points - reference_subset_centroid  # N x 3
-
-        # which direction should the procrustes calculate? weird flipping
-        rotation = orthogonal_procrustes(valid_markers_centered, reference_subset_centered)[0]
-        ref_points_translated = np.einsum('ij,tj->ti', rotation, ref_center_to_ref_points) + valid_markers_centroid
-
-        return rotation, ref_points_translated
 
     def _solve_multiple(self, markers):
         # check which markers have nan values
