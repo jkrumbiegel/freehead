@@ -7,13 +7,14 @@ from .u_theta import u_theta
 from .from_yawpitchroll import from_yawpitchroll
 from .to_yawpitchroll import to_yawpitchroll
 from .get_rig_transform import get_rig_transform
-from .constants import LED_POSITIONS, FOUR_MARKER_PROBE
+from .constants import LED_POSITIONS
 from .to_unit import to_unit
 from .markers_to_ortho import markers_to_ortho
 from .calibrate_pupil import calibrate_pupil
-from .rigidbody import Rigidbody
+from .rigidbody import Rigidbody, FourMarkerProbe
 from .is_rotation_matrix import is_rotation_matrix
 from .tup3d import tup3d
+from .multidim_ortho_procrustes import multidim_ortho_procrustes
 
 root = logging.getLogger('freehead')
 if not root.handlers:

@@ -13,5 +13,7 @@ setup(
         'zmq',
         'pylsl',
         'msgpack',
+        'yaml',
+        'pygame',
     ],
     zip_safe=False)
