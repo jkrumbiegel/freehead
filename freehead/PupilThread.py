@@ -51,6 +51,10 @@ class PupilThread(threading.Thread):
 
         # define thread synchronization events
         self.should_stop = threading.Event()
+        self.started_running = threading.Event()
+        self.recording_allowed = threading.Event()
+        self.requesting_data_reset = threading.Event()
+        self.reset_request_received = threading.Event()
 
         # set the pupil timer to 0
         self.synchronize_time()
@@ -65,7 +69,15 @@ class PupilThread(threading.Thread):
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, 'pupil.')
         logger.info('Success.')
 
+        self.started_running.set()
+
         while not self.should_stop.is_set():
+
+            if self.requesting_data_reset.is_set():
+                self.reset_request_received.set()
+                logger.info('Waiting for recording allowance')
+                self.recording_allowed.wait()
+                logger.info('Recording allowance received. Continuing.')
 
             if self.i_current_sample == self.buffer_length - 1:
                 self.buffer_limit_reached = True
@@ -90,11 +102,8 @@ class PupilThread(threading.Thread):
                 logger.warning('Keyboard Interrupt detected, closing...')
                 break
 
-            system_time_received = time.perf_counter()
-
             if not self.buffer_limit_reached:
                 self.data[self.i_current_sample, :] = self.current_sample
-
 
             self.i_current_sample += 1
 
@@ -109,10 +118,22 @@ class PupilThread(threading.Thread):
         logger.info('Sync successful.')
 
     def reset_data_buffer(self):
+        if self.started_running.is_set():
+            self.recording_allowed.clear()
+            self.requesting_data_reset.set()
+            logger.info('Waiting for reset request received signal.')
+            self.reset_request_received.wait()
+            # now the data gathering loop should wait for allowance, the data array can be reset
+
         data_array = np.full((self.buffer_length, self.sample_size), np.nan, dtype=np.float)
         self.data = data_array
         self.i_current_sample = 0
         self.buffer_limit_reached = False
+        logger.info('Successfully reset data array.')
+
+        self.reset_request_received.clear()
+        self.requesting_data_reset.clear()
+        self.recording_allowed.set()
 
     def cleanup(self):
         self.request_socket.close()
