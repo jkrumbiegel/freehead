@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.linalg import orthogonal_procrustes
 import freehead as fh
 import pickle
 import os
@@ -26,6 +25,21 @@ class Rigidbody:
             return rotation.reshape((3, 3)), ref_points.reshape((-1, 3))
         elif markers.ndim == 3:
             return self._solve_multiple(markers)
+
+    def add_reference_points(self, markers, new_ref_points):
+        if new_ref_points.ndim != 2 or new_ref_points.shape[1] != 3:
+            raise Exception('Reference points need to have 2 dimensions and the second dimension size 3.')
+
+        # find out current rotation of the rigidbody
+        current_rotation, current_ref_points = self.solve(markers)
+        # calculate distance to first reference point (usually marker centroid)
+        first_ref_to_new_ref = new_ref_points - current_ref_points[0, :]
+        # rotate that distance into neutral position
+        distance_in_neutral_rotation = np.einsum('ij,mj->mi', current_rotation.T, first_ref_to_new_ref)
+        # add it to the reference position to get new reference points in rigidbody neutral position
+        new_ref_in_neutral_rotation = self.ref_points[0, :] + distance_in_neutral_rotation
+        # add new reference points to array
+        self.ref_points = np.vstack((self.ref_points, new_ref_in_neutral_rotation))
 
     def _solve_multiple(self, markers):
         # check which markers have nan values
