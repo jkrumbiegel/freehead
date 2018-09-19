@@ -2,6 +2,7 @@ import logging
 import sys
 from .PupilThread import PupilThread
 from .OptotrakThread import OptotrakThread
+from .ArduinoThread import ArduinoThread
 from .wait_for_keypress import wait_for_keypress
 from .u_theta import u_theta
 from .from_yawpitchroll import from_yawpitchroll
