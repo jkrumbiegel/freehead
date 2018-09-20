@@ -16,6 +16,8 @@ from .rigidbody import Rigidbody, FourMarkerProbe
 from .is_rotation_matrix import is_rotation_matrix
 from .tup3d import tup3d
 from .multidim_ortho_procrustes import multidim_ortho_procrustes
+from .anynan import anynan
+from .LedShiftExperiment import LedShiftExperiment
 
 root = logging.getLogger('freehead')
 if not root.handlers:
