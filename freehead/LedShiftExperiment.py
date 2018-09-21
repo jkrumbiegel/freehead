@@ -4,6 +4,7 @@ import time
 import enum
 import pygame
 
+
 class Phase(enum.Enum):
     BEFORE_FIXATION = 0
     DURING_FIXATION = 1
@@ -11,9 +12,8 @@ class Phase(enum.Enum):
     DURING_SACCADE = 3
     AFTER_LANDING = 4
 
-class LedShiftExperiment:
 
-    trial_data = []
+class LedShiftExperiment:
 
     def __init__(
             self,
@@ -25,6 +25,8 @@ class LedShiftExperiment:
             rig_leds: np.ndarray,
             settings: dict
     ):
+        self.trial_data = []
+
         self.othread = othread
         self.pthread = pthread
         self.athread = athread
@@ -50,9 +52,13 @@ class LedShiftExperiment:
         self.fixation_threshold = settings['fixation_threshold']
         self.fixation_duration = settings['fixation_duration']
         self.maximum_saccade_latency = settings['maximum_saccade_latency']
-        self.maximum_saccade_duration = settings['maximum_saccade_duration']
+        self.maximum_target_reaching_duration = settings['maximum_target_reaching_duration']
         self.after_landing_fixation_threshold = settings['after_landing_fixation_threshold']
         self.after_landing_fixation_duration = settings['after_landing_fixation_duration']
+
+        self.with_blanking = settings['with_blanking']
+        if self.with_blanking:
+            self.blanking_duration = settings['blanking_duration']
 
     def build_trial_matrix(self):
         return np.repeat(self.shift_magnitudes, self.trials_per_shift)
@@ -66,12 +72,16 @@ class LedShiftExperiment:
             self.pthread.reset_data_buffer()
 
             # set up variables for one trial
-            chosen_trial = np.random.choice(self.remaining_trials)
-            current_shift = self.shift_magnitudes[chosen_trial]
+            random_index = np.random.randint(self.remaining_trials.size)
+            chosen_trial = self.remaining_trials[random_index]
+            current_shift = self.trial_matrix[chosen_trial]
             current_offset = np.random.randint(-self.max_random_led_offset, self.max_random_led_offset + 1)
             current_fixation = self.default_fixation_led_index + current_offset
             current_target = self.default_target_led_index + current_offset
             current_shifted_target = self.default_target_led_index + current_offset + current_shift
+
+            if self.with_blanking:
+                t_blanking_ended = None
 
             # show the fixation led
             self.athread.write_uint8(current_fixation, *self.before_fixation_color)
@@ -161,24 +171,49 @@ class LedShiftExperiment:
                     if not is_fixating:
                         i_saccade_started = current_i
                         t_saccade_started = time.monotonic()
-                        self.athread.write_uint8(current_shifted_target, *self.before_fixation_color)
+                        if self.with_blanking:
+                            self.athread.write_uint8(255, 0, 0, 0)
+                        else:
+                            self.athread.write_uint8(current_shifted_target, *self.before_response_target_color)
+
                         phase = Phase.DURING_SACCADE
 
                 elif phase == Phase.DURING_SACCADE:
+                    if not self.with_blanking:
+                        if time.monotonic() - t_saccade_started > self.maximum_target_reaching_duration:
+                            # abort trial because saccade took too long
+                            break
 
-                    if time.monotonic() - t_saccade_started > self.maximum_saccade_duration:
-                        # abort trial because saccade took too long
-                        break
+                        eye_to_shifted_target = fh.to_unit(self.rig_leds[current_shifted_target, :] - T_eye_world)
+                        gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
+                        eye_to_shifted_target_angle = np.rad2deg(np.arccos(eye_to_shifted_target @ gaze_normals_world))
+                        is_fixating_target = eye_to_shifted_target_angle <= self.fixation_threshold
 
-                    eye_to_shifted_target = fh.to_unit(self.rig_leds[current_shifted_target, :] - T_eye_world)
-                    gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
-                    eye_to_shifted_target_angle = np.rad2deg(np.arccos(eye_to_shifted_target @ gaze_normals_world))
-                    is_fixating_target = eye_to_shifted_target_angle <= self.fixation_threshold
+                        if is_fixating_target:
+                            i_saccade_landed = current_i
+                            t_saccade_landed = time.monotonic()
+                            phase = Phase.AFTER_LANDING
+                    else:
+                        if time.monotonic() - t_saccade_started >= self.blanking_duration:
+                            if t_blanking_ended is None:
+                                t_blanking_ended = time.monotonic()
+                                i_blanking_ended = current_i
+                                self.athread.write_uint8(current_shifted_target, *self.before_response_target_color)
 
-                    if is_fixating_target:
-                        i_saccade_landed = current_i
-                        t_saccade_landed = time.monotonic()
-                        phase = Phase.AFTER_LANDING
+                            if time.monotonic() - t_blanking_ended > self.maximum_target_reaching_duration:
+                                # abort trial because saccade to target took too long
+                                break
+
+                            eye_to_shifted_target = fh.to_unit(self.rig_leds[current_shifted_target, :] - T_eye_world)
+                            gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
+                            eye_to_shifted_target_angle = np.rad2deg(
+                                np.arccos(eye_to_shifted_target @ gaze_normals_world))
+                            is_fixating_target = eye_to_shifted_target_angle <= self.fixation_threshold
+
+                            if is_fixating_target:
+                                i_saccade_landed = current_i
+                                t_saccade_landed = time.monotonic()
+                                phase = Phase.AFTER_LANDING
 
                 elif phase == Phase.AFTER_LANDING:
 
@@ -197,6 +232,9 @@ class LedShiftExperiment:
                         # abort trial because after saccade fixation was not long enough
                         break
 
+            # sampling loop over
+        # trial loop over
+
         current_trial_data = {
             'trial_index': chosen_trial,
             'o_data': self.othread.get_shortened_data(),
@@ -213,9 +251,14 @@ class LedShiftExperiment:
             'response': response
         }
 
+        if self.with_blanking:
+            current_trial_data['i_blanking_ended'] = i_blanking_ended
+            current_trial_data['t_blanking_ended'] = t_blanking_ended
+
         self.trial_data.append(current_trial_data)
+
         # remove the completed trial from the remaining trials array
-        np.delete(self.remaining_trials, chosen_trial)
+        self.remaining_trials = np.delete(self.remaining_trials, random_index)
 
 
 
