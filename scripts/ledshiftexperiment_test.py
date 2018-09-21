@@ -3,6 +3,7 @@ import numpy as np
 import pygame
 import os
 import pickle
+from datetime import datetime
 
 pygame.init()
 pygame.display.set_mode((300, 300))
@@ -122,7 +123,7 @@ calibration_result = fh.calibrate_pupil(
         gaze_normals,
         T_target_world,
         ini_T_eye_head = helmet.ref_points[5, :] - helmet.ref_points[0, :],
-        bounds_mm=15)
+        bounds_mm=12)
 
 R_eye_head = fh.from_yawpitchroll(calibration_result.x[0:3])
 T_eye_head = calibration_result.x[3:6]
@@ -139,7 +140,7 @@ fix_threshold_eye = 2
 fix_threshold_head = 5
 fixation_duration = 0.8
  
-n_per_offset = 20
+n_per_offset = 2
 offsets = np.arange(-5, 6) * 2
 offset_array = np.repeat(offsets, n_per_offset)
 np.random.shuffle(offset_array)
@@ -149,13 +150,6 @@ saccade_phase = 1
 landing_phase = 2
 
 # %%
-o_data_list = []
-p_data_list = []
-response_list = []
-target_shift_list = []
-start_led_list = []
-target_led_list = []
-saccade_i_list = []
 
 settings = {
     'trials_per_shift': 20,
@@ -163,20 +157,24 @@ settings = {
     'default_fixation_led_index': 50,
     'default_target_led_index': 200,
     'max_random_led_offset': 10,
-    'before_fixation_color': (5, 0, 0),
-    'during_fixation_color': (0, 5, 0),
-    'before_response_target_color': (0, 5, 0),
-    'during_response_target_color': (0, 0, 5),
+    'before_fixation_color': (1, 0, 0),
+    'during_fixation_color': (0, 1, 0),
+    'before_response_target_color': (0, 1, 0),
+    'during_response_target_color': (0, 0, 1),
     'pupil_min_confidence': 0.25,
     'fixation_threshold': 2,
-    'fixation_duration': 0.3,
-    'maximum_saccade_latency': 0.4,
-    'maximum_saccade_duration': 0.2,
+    'fixation_duration': 0.5,
+    'maximum_saccade_latency': 0.5,
+    'maximum_target_reaching_duration': 0.5,
     'after_landing_fixation_threshold': 4,
-    'after_landing_fixation_duration': 0.3
+    'after_landing_fixation_duration': 0.5,
+    'with_blanking': True,
+    'blanking_duration': 0.25
 }
 
 experiment = fh.LedShiftExperiment(othread, pthread, athread, helmet, R_eye_head, rig_led_positions, settings)
+for i in range(experiment.trial_matrix.shape[0]):
+    experiment.run_trial()
 
 athread.write_uint8(255, 0, 0, 0)
 # %%        
@@ -193,7 +191,7 @@ athread.join()
 
 print('done')
 
-
+# %%
 data = {
     'trial_data': experiment.trial_data,
     'settings': settings,
@@ -205,12 +203,8 @@ data = {
 }
 
 identifier = 'led_shift_experiment'
-counter = 0
-while True:
-    filename = identifier + '.pickle' if counter == 0 else identifier + '_' + counter + '.pickle'
-    if os.path.isfile(filename):
-        counter += 1
-    else:
-        with open(filename, 'wb') as f:
-            pickle.dump(data, f)
+date = datetime.strftime(datetime.now(), '%Y-%m-%d_%H-%M-%S')
+filename = identifier + '_' + date +  '.pickle'
+with open(filename, 'wb') as f:
+    pickle.dump(data, f)
 
