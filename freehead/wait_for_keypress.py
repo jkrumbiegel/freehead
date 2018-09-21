@@ -2,6 +2,8 @@ import pygame
 
 
 def wait_for_keypress(*keys):
+    # flush events first so old keypresses don't count
+    pygame.event.clear()
     key_detected = False
     while not key_detected:
         keydowns = []
