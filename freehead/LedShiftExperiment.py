@@ -51,6 +51,7 @@ class LedShiftExperiment:
         self.pupil_min_confidence = settings['pupil_min_confidence']
         self.fixation_threshold = settings['fixation_threshold']
         self.fixation_duration = settings['fixation_duration']
+        self.saccade_threshold = settings['saccade_threshold']
         self.maximum_saccade_latency = settings['maximum_saccade_latency']
         self.maximum_target_reaching_duration = settings['maximum_target_reaching_duration']
         self.after_landing_fixation_threshold = settings['after_landing_fixation_threshold']
@@ -166,9 +167,9 @@ class LedShiftExperiment:
                     eye_to_fixpoint = fh.to_unit(self.rig_leds[current_fixation, :] - T_eye_world)
                     gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
                     eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
-                    is_fixating = eye_to_fixpoint_angle <= self.fixation_threshold
+                    has_started_saccade = eye_to_fixpoint_angle > self.saccade_threshold
 
-                    if not is_fixating:
+                    if has_started_saccade:
                         i_saccade_started = current_i
                         t_saccade_started = time.monotonic()
                         if self.with_blanking:
