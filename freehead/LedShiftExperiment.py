@@ -51,6 +51,7 @@ class LedShiftExperiment:
         self.pupil_min_confidence = settings['pupil_min_confidence']
         self.fixation_threshold = settings['fixation_threshold']
         self.fixation_duration = settings['fixation_duration']
+        self.fixation_head_velocity_threshold = settings['fixation_head_velocity_threshold']
         self.saccade_threshold = settings['saccade_threshold']
         self.maximum_saccade_latency = settings['maximum_saccade_latency']
         self.maximum_target_reaching_duration = settings['maximum_target_reaching_duration']
@@ -90,6 +91,7 @@ class LedShiftExperiment:
 
             t_trial_started = time.monotonic()
             last_i = None
+            R_head_world = np.full((3, 3), np.nan)
             # this loop runs during data collection in the trial
             # if you break out of it and trial_successful is not true, another try is started with new randomly picked
             # settings
@@ -109,6 +111,7 @@ class LedShiftExperiment:
 
                 odata = self.othread.current_sample.copy()
                 helmet_leds = odata[3:15].reshape((4, 3))
+                last_R_head_world = R_head_world
                 R_head_world, helmet_ref_points = self.helmet.solve(helmet_leds)
                 T_eye_world = helmet_ref_points[5, :]
 
@@ -124,14 +127,21 @@ class LedShiftExperiment:
                         # in later phases, the target was already visible, start a new one
                         break
 
+                current_head_angular_velocity = 0 if np.allclose(last_R_head_world, R_head_world) else np.rad2deg(
+                    np.arccos(
+                        (np.trace(last_R_head_world @ R_head_world.T) - 1) / 2
+                    )
+                ) * self.othread.server_config['optotrak']['collection_frequency']
+
                 if phase == Phase.BEFORE_FIXATION:
 
                     eye_to_fixpoint = fh.to_unit(self.rig_leds[current_fixation, :] - T_eye_world)
                     gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
                     eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
                     is_fixating = eye_to_fixpoint_angle <= self.fixation_threshold
+                    is_holding_still = current_head_angular_velocity <= self.fixation_head_velocity_threshold
 
-                    if is_fixating:
+                    if is_fixating and is_holding_still:
                         self.athread.write_uint8(current_fixation, *self.during_fixation_color)
                         t_started_fixating = time.monotonic()
                         i_started_fixating = current_i
@@ -143,14 +153,13 @@ class LedShiftExperiment:
                     gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
                     eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
                     is_fixating = eye_to_fixpoint_angle <= self.fixation_threshold
+                    is_holding_still = current_head_angular_velocity <= self.fixation_head_velocity_threshold
 
-                    if not is_fixating:
+                    if not (is_fixating and is_holding_still):
                         self.athread.write_uint8(current_fixation, *self.before_fixation_color)
                         phase = Phase.BEFORE_FIXATION
                         # if fixation is lost here, don't start a completely new trial, that would be wasteful because
                         # the target wasn't even shown
-                        continue
-
                     else:
                         if time.monotonic() - t_started_fixating >= self.fixation_duration:
                             i_target_appeared = current_i
