@@ -96,5 +96,12 @@ class Rigidbody:
 class FourMarkerProbe(Rigidbody):
     def __init__(self):
         calib_file_path = os.path.join(os.path.dirname(__file__), '../datafiles/four_marker_probe_calibrated.pickle')
-        calibration = pickle.load(open(calib_file_path, 'rb' ))
+        calibration = pickle.load(open(calib_file_path, 'rb'))
         super(FourMarkerProbe, self).__init__(calibration['markers'], ref_points=calibration['ref_point'])
+
+class LedRig(Rigidbody):
+    def __init__(self, marker_indices):
+        # marker indices are the markers you want to sample to align the rigid body
+        calib_file_path = os.path.join(os.path.dirname(__file__), '../datafiles/led_rig_calibration.npy')
+        led_positions = np.load(calib_file_path)
+        super(LedRig, self).__init__(led_positions[marker_indices, :], ref_points=led_positions)
