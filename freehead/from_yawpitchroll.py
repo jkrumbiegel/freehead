@@ -16,8 +16,8 @@ def from_yawpitchroll(*args, in_degrees=True):
     if in_degrees:
         ypr = np.deg2rad(ypr)
 
-    yaw_rotation = freehead.u_theta(np.array([0, 1, 0]), ypr[0])
-    pitch_rotation = freehead.u_theta(np.array([1, 0, 0]), ypr[1])
-    roll_rotation = freehead.u_theta(np.array([0, 0, 1]), ypr[2])
+    yaw_rotation = freehead.u_theta(np.array([0, 0, 1]), ypr[0])
+    pitch_rotation = freehead.u_theta(np.array([0, 1, 0]), ypr[1])
+    roll_rotation = freehead.u_theta(np.array([1, 0, 0]), ypr[2])
 
     return roll_rotation @ pitch_rotation @ yaw_rotation
