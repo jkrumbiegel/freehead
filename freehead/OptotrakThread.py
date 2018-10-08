@@ -84,7 +84,7 @@ default_server_config = {
     'optotrak': {
         'file_identifier': 'optotrak_pupil_1',
         'save_buffer_file': False,
-        'cam_filename': 'Aligned20180926',
+        'cam_filename': 'Aligned20181008',
         'matlab_to_optotrak_mex_path': r'C:\Users\locallab\Documents\Visual Studio 2015\Projects\Matlab_to_Optotrak\Debug',
         'collection_num_markers_1': 4,  # 4 helmet
         'collection_num_markers_2': 4,  # 4 marker probe
