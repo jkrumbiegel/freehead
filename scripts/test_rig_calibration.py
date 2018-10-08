@@ -34,3 +34,12 @@ athread.write_uint8(255, 0, 0, 0)
 
 rig = fh.LedRig(rig_calibration_indices)
 rotation, rig_led_positions = rig.solve(led_positions)
+
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(3, 1)
+axes[0].plot(rig_led_positions[:, 0], rig_led_positions[:, 1])
+axes[1].plot(rig_led_positions[:, 0], rig_led_positions[:, 2])
+axes[2].plot(rig_led_positions[:, 2], rig_led_positions[:, 1])
+[ax.set_aspect('equal') for ax in axes]
