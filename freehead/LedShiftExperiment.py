@@ -258,7 +258,12 @@ class LedShiftExperiment:
             'i_saccade_started': i_saccade_started,
             't_saccade_landed': t_saccade_landed,
             'i_saccade_landed': i_saccade_landed,
-            'response': response
+            'response': response,
+            'shift': current_shift,
+            'random_offset': current_offset,
+            'fixation_led':  current_fixation,
+            'target_led': current_target,
+            'shifted_target_led': current_shifted_target,
         }
 
         if self.with_blanking:
