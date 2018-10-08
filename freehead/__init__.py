@@ -11,13 +11,14 @@ from .get_rig_transform import get_rig_transform
 from .constants import LED_POSITIONS
 from .to_unit import to_unit
 from .markers_to_ortho import markers_to_ortho
-from .calibrate_pupil import calibrate_pupil
+from .calibrate_pupil import calibrate_pupil, calibrate_pupil_rotation, calibrate_pupil_translation
 from .rigidbody import Rigidbody, FourMarkerProbe, LedRig
 from .is_rotation_matrix import is_rotation_matrix
 from .tup3d import tup3d
 from .multidim_ortho_procrustes import multidim_ortho_procrustes
 from .anynan import anynan
 from .LedShiftExperiment import LedShiftExperiment
+from .qplot3d import qplot3d
 
 root = logging.getLogger('freehead')
 if not root.handlers:
