@@ -11,7 +11,7 @@ from .get_rig_transform import get_rig_transform
 from .constants import LED_POSITIONS
 from .to_unit import to_unit
 from .markers_to_ortho import markers_to_ortho
-from .calibrate_pupil import calibrate_pupil, calibrate_pupil_rotation, calibrate_pupil_translation
+from .calibrate_pupil import *
 from .rigidbody import Rigidbody, FourMarkerProbe, LedRig
 from .is_rotation_matrix import is_rotation_matrix
 from .tup3d import tup3d
@@ -20,6 +20,7 @@ from .anynan import anynan
 from .LedShiftExperiment import LedShiftExperiment
 from .qplot3d import qplot3d
 from .create_trial_frame import create_trial_frame
+from .normals_nonlinear_angular_transform import normals_nonlinear_angular_transform
 
 root = logging.getLogger('freehead')
 if not root.handlers:

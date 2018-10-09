@@ -73,3 +73,38 @@ def calibrate_pupil_translation(T_head_world, R_head_world, gaze_normals, T_targ
         return np.sum(angles)
 
     return minimize(err_func, T_eye_head_ini)
+
+
+def calibrate_pupil_nonlinear(
+        T_head_world,
+        R_head_world,
+        gaze_normals,
+        T_target_world,
+        ini_T_eye_head=np.zeros(3),
+        ini_ypr=np.zeros(3),
+        ini_polynom_params=np.zeros(6)):
+
+    def err_func(params):
+        T_eye_head = params[0:3]
+        R_eye_head = fh.from_yawpitchroll(params[3:6])
+        aa = params[6:8]
+        bb = params[8:10]
+        cc = params[10:12]
+
+        T_eye_world = np.einsum('tij,j->ti', R_head_world, T_eye_head) + T_head_world
+        eye_to_target = fh.to_unit(T_target_world - T_eye_world)
+
+        gaze_normals_head = np.einsum('ij,tj->ti', R_eye_head, gaze_normals)
+        gaze_normals_transformed = fh.normals_nonlinear_angular_transform(gaze_normals_head, aa, bb, cc)
+
+        gaze_normals_world = np.einsum(
+            'tij,tj->ti',
+            R_head_world,
+            gaze_normals_transformed)
+
+        angles = np.rad2deg(np.arccos(np.einsum('ti,ti->t', gaze_normals_world, eye_to_target)))
+        return (angles ** 2).sum()
+
+    ini_params = np.concatenate((ini_T_eye_head, ini_ypr, ini_polynom_params))
+
+    return minimize(err_func, ini_params)
