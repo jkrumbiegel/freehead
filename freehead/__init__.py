@@ -19,6 +19,7 @@ from .multidim_ortho_procrustes import multidim_ortho_procrustes
 from .anynan import anynan
 from .LedShiftExperiment import LedShiftExperiment
 from .qplot3d import qplot3d
+from .create_trial_frame import create_trial_frame
 
 root = logging.getLogger('freehead')
 if not root.handlers:
