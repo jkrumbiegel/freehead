@@ -18,7 +18,7 @@ def calibrate_pupil(T_head_world, R_head_world, gaze_normals, T_target_world, in
             np.einsum('ij,tj->ti', R_eye_head, gaze_normals))
 
         angles = np.rad2deg(np.arccos(np.einsum('ti,ti->t', gaze_normals_world, eye_to_target)))
-        return np.sum(angles)
+        return np.mean(angles)
 
     ini_parameters = np.concatenate((np.zeros(3), ini_T_eye_head))
 
@@ -82,29 +82,58 @@ def calibrate_pupil_nonlinear(
         T_target_world,
         ini_T_eye_head=np.zeros(3),
         ini_ypr=np.zeros(3),
-        ini_polynom_params=np.zeros(6)):
+        ini_polynom_params=np.array([0, 0, 1.0, 1.0, 0, 0]),
+        leave_T_eye_head=False):
 
-    def err_func(params):
-        T_eye_head = params[0:3]
-        R_eye_head = fh.from_yawpitchroll(params[3:6])
-        aa = params[6:8]
-        bb = params[8:10]
-        cc = params[10:12]
+    if leave_T_eye_head:
 
-        T_eye_world = np.einsum('tij,j->ti', R_head_world, T_eye_head) + T_head_world
-        eye_to_target = fh.to_unit(T_target_world - T_eye_world)
+        def err_func(params):
+            T_eye_head = ini_T_eye_head
+            R_eye_head = fh.from_yawpitchroll(params[0:3])
+            aa = params[3:5]
+            bb = params[5:7]
+            cc = params[7:9]
 
-        gaze_normals_head = np.einsum('ij,tj->ti', R_eye_head, gaze_normals)
-        gaze_normals_transformed = fh.normals_nonlinear_angular_transform(gaze_normals_head, aa, bb, cc)
+            T_eye_world = np.einsum('tij,j->ti', R_head_world, T_eye_head) + T_head_world
+            eye_to_target = fh.to_unit(T_target_world - T_eye_world)
 
-        gaze_normals_world = np.einsum(
-            'tij,tj->ti',
-            R_head_world,
-            gaze_normals_transformed)
+            gaze_normals_head = np.einsum('ij,tj->ti', R_eye_head, gaze_normals)
+            gaze_normals_head_transformed = fh.normals_nonlinear_angular_transform(gaze_normals_head, aa, bb, cc)
 
-        angles = np.rad2deg(np.arccos(np.einsum('ti,ti->t', gaze_normals_world, eye_to_target)))
-        return (angles ** 2).sum()
+            gaze_normals_world = np.einsum(
+                'tij,tj->ti',
+                R_head_world,
+                gaze_normals_head_transformed)
 
-    ini_params = np.concatenate((ini_T_eye_head, ini_ypr, ini_polynom_params))
+            angles = np.rad2deg(np.arccos(np.einsum('ti,ti->t', gaze_normals_world, eye_to_target)))
+            return angles.mean()
+
+        ini_params = np.concatenate((ini_ypr, ini_polynom_params))
+
+    else:
+
+        def err_func(params):
+
+            R_eye_head = fh.from_yawpitchroll(params[0:3])
+            aa = params[3:5]
+            bb = params[5:7]
+            cc = params[7:9]
+            T_eye_head = params[9:12]
+
+            T_eye_world = np.einsum('tij,j->ti', R_head_world, T_eye_head) + T_head_world
+            eye_to_target = fh.to_unit(T_target_world - T_eye_world)
+
+            gaze_normals_head = np.einsum('ij,tj->ti', R_eye_head, gaze_normals)
+            gaze_normals_head_transformed = fh.normals_nonlinear_angular_transform(gaze_normals_head, aa, bb, cc)
+
+            gaze_normals_world = np.einsum(
+                'tij,tj->ti',
+                R_head_world,
+                gaze_normals_head_transformed)
+
+            angles = np.rad2deg(np.arccos(np.einsum('ti,ti->t', gaze_normals_world, eye_to_target)))
+            return angles.mean()
+
+        ini_params = np.concatenate((ini_T_eye_head, ini_ypr, ini_polynom_params))
 
     return minimize(err_func, ini_params)

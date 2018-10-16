@@ -6,6 +6,7 @@ import pygame
 import pandas as pd
 from collections import OrderedDict
 from scipy.interpolate import interp1d
+from typing import Optional
 
 
 class Phase(enum.Enum):
@@ -31,7 +32,7 @@ class LedShiftExperiment:
             athread: fh.ArduinoThread,
             rig_leds: np.ndarray,
             trial_frame: pd.DataFrame,
-            calib_duration: 10,
+            calib_duration=10,
     ):
         self.trial_data = []
 
@@ -46,66 +47,93 @@ class LedShiftExperiment:
         self.R_eye_head = None
         self.nonlinear_parameters = None
 
-
-        # self.trials_per_shift = settings['trials_per_shift']
-        # self.shift_magnitudes = settings['shift_magnitudes']
         self.blocks = self.trial_frame['block'].unique()
         self.remaining_trials = np.arange(len(self.trial_frame))
 
-    def run(self):
+    def run(self) -> pd.DataFrame:
 
+        self.create_helmet()
         self.calibrate()
 
-        for block in self.blocks:
-            self.run_block(block)
+        experiment_dataframe = None
+        block_lengths = self.trial_frame['block'].value_counts(sort=False).values
+        block_borders = np.concatenate(([0], np.cumsum(block_lengths)))
 
-    def run_block(self, block):
+        for block in self.blocks:
+            block_dataframe = self.run_block(block)
+            block_dataframe['trial_in_block'] = block_dataframe.index
+            # make a new index so the trial numbers are correct when appending. trials are in random order depending on
+            # when they were successfully finished
+            block_dataframe.index = pd.Series(np.arange(block_borders[block], block_borders[block + 1]))
+
+            if experiment_dataframe is None:
+                experiment_dataframe = block_dataframe
+            else:
+                experiment_dataframe = experiment_dataframe.append(block_dataframe)
+
+        return experiment_dataframe
+
+    def run_block(self, block) -> pd.DataFrame:
         block_frame = self.trial_frame[self.trial_frame['block'] == block]
         remaining_block_trials = block_frame.index.values
+        block_dataframe = None
+        trial_in_block = 0
         while remaining_block_trials.size > 0:
             random_index = np.random.randint(0, remaining_block_trials.size)
             random_trial_number = remaining_block_trials[random_index]
 
-            (trial_result, trial_data) = self.run_trial(block_frame[random_trial_number])
+            (trial_result, trial_data) = self.run_trial(block_frame.loc[random_trial_number])
 
             if trial_result == TrialResult.COMPLETED:
                 remaining_block_trials = np.delete(remaining_block_trials, random_index)
-                # do something with trial data
+
+                trial_data.update({'trial_number': random_trial_number, 'block': block})
+                trial_data.move_to_end('block', last=False)
+                trial_data.move_to_end('trial_number', last=False)
+
+                if block_dataframe is None:
+                    block_dataframe = pd.DataFrame(trial_data, index=[trial_in_block])
+                else:
+                    block_dataframe = block_dataframe.append(pd.DataFrame(trial_data, index=[trial_in_block]))
+                trial_in_block += 1
 
             elif trial_result == TrialResult.FAILED:
                 pass
 
             elif trial_result == TrialResult.CALIBRATE:
+                self.create_helmet()
                 self.calibrate()
 
-    def run_trial(self, trial_frame):
+        return block_dataframe
+
+    def run_trial(self, trial_frame: pd.DataFrame) -> (TrialResult, Optional[OrderedDict]):
 
         self.othread.reset_data_buffer()
         self.pthread.reset_data_buffer()
 
         # set up variables for one trial
-        shift = trial_frame['shift'].iloc[0]
-        amplitude = trial_frame['amplitude'].iloc[0]
-        fixation_led = trial_frame['fixation_led'].iloc[0]
+        shift = trial_frame['shift']
+        amplitude = trial_frame['amplitude']
+        fixation_led = trial_frame['fixation_led']
         target_led = fixation_led + amplitude
         shifted_target_led = target_led + shift
-        fixation_threshold = trial_frame['fixation_threshold'].iloc[0]
-        fixation_head_velocity_threshold = trial_frame['fixation_head_velocity_threshold'].iloc[0]
-        saccade_threshold = trial_frame['saccade_threshold'].iloc[0]
-        after_landing_fixation_threshold = trial_frame['after_landing_fixation_threshold'].iloc[0]
+        fixation_threshold = trial_frame['fixation_threshold']
+        fixation_head_velocity_threshold = trial_frame['fixation_head_velocity_threshold']
+        saccade_threshold = trial_frame['saccade_threshold']
+        after_landing_fixation_threshold = trial_frame['after_landing_fixation_threshold']
 
-        pupil_min_confidence = trial_frame['pupil_min_confidence'].iloc[0]
+        pupil_min_confidence = trial_frame['pupil_min_confidence']
 
-        before_fixation_color = trial_frame['before_fixation_color'].iloc[0]
-        during_fixation_color = trial_frame['during_fixation_color'].iloc[0]
-        before_response_target_color = trial_frame['before_response_target_color'].iloc[0]
-        during_response_target_color = trial_frame['during_response_target_color'].iloc[0]
+        before_fixation_color = trial_frame['before_fixation_color']
+        during_fixation_color = trial_frame['during_fixation_color']
+        before_response_target_color = trial_frame['before_response_target_color']
+        during_response_target_color = trial_frame['during_response_target_color']
 
-        fixation_duration = trial_frame['fixation_duration'].iloc[0]
-        blanking_interval = trial_frame['blanking_interval'].iloc[0]
-        maximum_target_reaching_duration = trial_frame['maximum_target_reaching_duration'].iloc[0]
-        maximum_saccade_latency = trial_frame['maximum_saccade_latency'].iloc[0]
-        after_landing_fixation_duration = trial_frame['after_landing_fixation_duration'].iloc[0]
+        fixation_duration = trial_frame['fixation_duration']
+        blanking_duration = trial_frame['blanking_duration']
+        maximum_target_reaching_duration = trial_frame['maximum_target_reaching_duration']
+        maximum_saccade_latency = trial_frame['maximum_saccade_latency']
+        after_landing_fixation_duration = trial_frame['after_landing_fixation_duration']
         
         t_started_fixating = None
         i_started_fixating = None
@@ -130,6 +158,10 @@ class LedShiftExperiment:
         # if trial_successful is true when you break out of it, the trial's parameters and timings are saved
         trial_successful = False
         while True:
+
+            # do calibration if c was pressed
+            if fh.was_key_pressed(pygame.K_c):
+                return TrialResult.CALIBRATE, None
 
             # check that a new pupil sample is available
             current_i = self.pthread.i_current_sample
@@ -157,7 +189,12 @@ class LedShiftExperiment:
                     self.athread.write_uint8(fixation_led, *before_fixation_color)
                     continue
                 else:
-                    # in later phases, the target was already visible, start a new one
+                    if fh.anynan(R_head_world):
+                        print('head was not visible')
+                    if fh.anynan(gaze_normals):
+                        print('nan values in gaze normals')
+                    if confidence < pupil_min_confidence:
+                        print('pupil confidence was too low')
                     break
 
             current_head_angular_velocity = 0 if np.allclose(last_R_head_world, R_head_world) else np.rad2deg(
@@ -169,9 +206,7 @@ class LedShiftExperiment:
             if phase == Phase.BEFORE_FIXATION:
 
                 eye_to_fixpoint = fh.to_unit(self.rig_leds[fixation_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ (
-                            fh.normals_nonlinear_angular_transform(
-                                self.R_eye_head @ gaze_normals, self.nonlinear_parameters))
+                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
                 eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
                 is_fixating = eye_to_fixpoint_angle <= fixation_threshold
                 is_holding_still = current_head_angular_velocity <= fixation_head_velocity_threshold
@@ -185,9 +220,7 @@ class LedShiftExperiment:
             elif phase == Phase.DURING_FIXATION:
 
                 eye_to_fixpoint = fh.to_unit(self.rig_leds[fixation_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ (
-                            fh.normals_nonlinear_angular_transform(
-                                self.R_eye_head @ gaze_normals, self.nonlinear_parameters))
+                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
                 eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
                 is_fixating = eye_to_fixpoint_angle <= fixation_threshold
                 is_holding_still = current_head_angular_velocity <= fixation_head_velocity_threshold
@@ -208,19 +241,18 @@ class LedShiftExperiment:
 
                 if time.monotonic() - t_target_appeared > maximum_saccade_latency:
                     # abort trial because saccade latency was too long
+                    print('maximum saccade latency exceeded')
                     break
 
                 eye_to_fixpoint = fh.to_unit(self.rig_leds[fixation_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ (
-                    fh.normals_nonlinear_angular_transform(
-                        self.R_eye_head @ gaze_normals, self.nonlinear_parameters))
+                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
                 eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
                 has_started_saccade = eye_to_fixpoint_angle > saccade_threshold
 
                 if has_started_saccade:
                     i_saccade_started = current_i
                     t_saccade_started = time.monotonic()
-                    if blanking_interval == 0:
+                    if blanking_duration == 0:
                         self.athread.write_uint8(shifted_target_led, *before_response_target_color)
                     else:
                         self.athread.write_uint8(255, 0, 0, 0)
@@ -229,20 +261,19 @@ class LedShiftExperiment:
 
             elif phase == Phase.DURING_SACCADE:
 
-                if time.monotonic() - t_saccade_started >= blanking_interval:
+                if time.monotonic() - t_saccade_started >= blanking_duration:
                     if t_blanking_ended is None:
                         t_blanking_ended = time.monotonic()
                         i_blanking_ended = current_i
                         self.athread.write_uint8(shifted_target_led, *before_response_target_color)
 
                     if time.monotonic() - t_blanking_ended > maximum_target_reaching_duration:
-                        # abort trial because saccade to target took too long
+                        print('maximum target reaching duration was exceeded')
                         break
 
                     eye_to_shifted_target = fh.to_unit(self.rig_leds[shifted_target_led, :] - T_eye_world)
-                    gaze_normals_world = R_head_world @ (
-                            fh.normals_nonlinear_angular_transform(
-                                self.R_eye_head @ gaze_normals, self.nonlinear_parameters))
+                    gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(
+                        self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
                     eye_to_shifted_target_angle = np.rad2deg(
                         np.arccos(eye_to_shifted_target @ gaze_normals_world))
                     is_fixating_target = eye_to_shifted_target_angle <= fixation_threshold
@@ -256,27 +287,31 @@ class LedShiftExperiment:
 
                 if time.monotonic() - t_saccade_landed > after_landing_fixation_duration:
                     self.athread.write_uint8(shifted_target_led, *during_response_target_color)
-                    response = fh.wait_for_keypress(pygame.K_LEFT, pygame.K_RIGHT)
+                    response_key = fh.wait_for_keypress(pygame.K_LEFT, pygame.K_RIGHT)
+                    response = 'left' if response_key == pygame.K_LEFT else 'right'
                     trial_successful = True
                     break
 
-                eye_to_shifted_target = fh.to_unit(self.rig_leds[shifted_target_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ (
-                    fh.normals_nonlinear_angular_transform(
-                        self.R_eye_head @ gaze_normals, self.nonlinear_parameters))
-                eye_to_shifted_target_angle = np.rad2deg(np.arccos(eye_to_shifted_target @ gaze_normals_world))
-                is_fixating_target_after_landing = eye_to_shifted_target_angle <= after_landing_fixation_threshold
+                # this part might have been triggered to easily, leave it out (target only has to be reached once)
 
-                if not is_fixating_target_after_landing:
-                    # abort trial because after saccade fixation was not long enough
-                    break
+                # eye_to_shifted_target = fh.to_unit(self.rig_leds[shifted_target_led, :] - T_eye_world)
+                # gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
+                # eye_to_shifted_target_angle = np.rad2deg(np.arccos(eye_to_shifted_target @ gaze_normals_world))
+                # is_fixating_target_after_landing = eye_to_shifted_target_angle <= after_landing_fixation_threshold
+                #
+                # if not is_fixating_target_after_landing:
+                #     print('landing target was not properly fixated')
+                #     break
 
         # sampling loop over
         if trial_successful:
 
             trial_data = OrderedDict([
-                ('o_data', self.othread.get_shortened_data()),
-                ('p_data', self.pthread.get_shortened_data()),
+                ('o_data', [self.othread.get_shortened_data()]), #  arrays need to be in a list so pandas doesn't try to make them long columns
+                ('p_data', [self.pthread.get_shortened_data()]),
+                ('helmet', self.helmet),
+                ('nonlinear_parameters', [self.nonlinear_parameters]),
+                ('R_eye_head', [self.R_eye_head]),
                 ('t_trial_started', t_trial_started),
                 ('i_started_fixating', i_started_fixating),
                 ('t_started_fixating', t_started_fixating),
@@ -326,39 +361,86 @@ class LedShiftExperiment:
             pdata = self.pthread.get_shortened_data().copy()
             gaze_normals = pdata[:, 3:6]
 
-            f_interpolate = interp1d(odata[:, 30], odata[:, 3:15], axis=0)
+            f_interpolate = interp1d(odata[:, 30], odata[:, 3:15], axis=0, bounds_error=False, fill_value=np.nan)
             odata_interpolated = f_interpolate(pdata[:, 2]).reshape((-1, 4, 3))
 
             R_head_world, ref_points = self.helmet.solve(odata_interpolated)
-            T_head_world = ref_points[:, 0]
+            T_head_world = ref_points[:, 0, :]
 
             confidence_enough = pdata[:, 6] > 0.6
             rotations_valid = ~np.any(np.isnan(R_head_world).reshape((-1, 9)), axis=1)
-            chosen_mask = np.logical_and(confidence_enough, rotations_valid)
+            chosen_mask = confidence_enough & rotations_valid
 
             T_target_world = np.tile(self.rig_leds[calibration_point, :], (chosen_mask.sum(), 1))
 
-            ini_T_eye_head = self.helmet.ref_points[5, :]
+            nasion_to_inion = fh.to_unit(self.helmet.ref_points[2, :] - self.helmet.ref_points[1, :])
+            estimated_eye_position = self.helmet.ref_points[5, :] + 12 * nasion_to_inion  # go inwards 12 mm in nasion inion direction
+            ini_T_eye_head = estimated_eye_position - self.helmet.ref_points[0, :]
+
+            # calibration_result = fh.calibrate_pupil_nonlinear(
+            #     T_head_world[chosen_mask, :],
+            #     R_head_world[chosen_mask, ...],
+            #     gaze_normals[chosen_mask, ...],
+            #     T_target_world,
+            #     ini_T_eye_head=ini_T_eye_head,
+            #     leave_T_eye_head=True)
 
             calibration_result = fh.calibrate_pupil_nonlinear(
-                T_head_world, R_head_world, gaze_normals, T_target_world, ini_T_eye_head=ini_T_eye_head)
+                T_head_world[chosen_mask, ...],
+                R_head_world[chosen_mask, ...],
+                gaze_normals[chosen_mask, ...],
+                T_target_world,
+                ini_T_eye_head=ini_T_eye_head,
+                leave_T_eye_head=True)
 
             print('Optimization done.\n')
-            print('Error: ', calibration_result.fval, '\n')
+            print('Error: ', calibration_result.fun, '\n')
             print('Parameters: ', calibration_result.x, '\n')
             print('Accept calibration? Yes: Space, No: Escape')
             key = fh.wait_for_keypress(pygame.K_SPACE, pygame.K_ESCAPE)
 
             if key == pygame.K_SPACE:
-                self.helmet.ref_points[5, :] = self.helmet.ref_points[0, :] + calibration_result.x[0:3]
-                self.R_eye_head = fh.from_yawpitchroll(calibration_result.x[4:6])
-                self.nonlinear_parameters = calibration_result.x[6:12]
+                self.R_eye_head = fh.from_yawpitchroll(calibration_result.x[0:3])
+                self.nonlinear_parameters = calibration_result.x[3:9]
+                #self.helmet.ref_points[5, :] = self.helmet.ref_points[0, :] + calibration_result.x[9:12]
                 break
 
             elif key == pygame.K_ESCAPE:
                 continue
 
+    def create_helmet(self):
+        head_measurement_points = [
+            'head straight',
+            'nasion',
+            'inion',
+            'right ear',
+            'left ear',
+            'right eye']
 
+        for i, measurement_point in enumerate(head_measurement_points):
+            print('Press space to measure: ' + measurement_point)
+            while True:
+                fh.wait_for_keypress(pygame.K_SPACE)
+                current_sample = self.othread.current_sample.copy()
+                helmet_leds = current_sample[3:15].reshape((4, 3))
+
+                if np.any(np.isnan(helmet_leds)):
+                    print('Helmet LEDs not all visible. Try again.')
+                    continue
+
+                if i == 0:
+                    helmet = fh.Rigidbody(helmet_leds)
+                    break
+                else:
+                    _, probe_tip = fh.FourMarkerProbe().solve(current_sample[15:27].reshape((4, 3)))
+                    if np.any(np.isnan(probe_tip)):
+                        print('Probe not visible. Try again.')
+                        continue
+                    helmet.add_reference_points(helmet_leds, probe_tip)
+                    break
+
+        self.helmet = helmet
+        print('Helmet creation done.')
 
 
 
