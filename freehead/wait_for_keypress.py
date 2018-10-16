@@ -1,4 +1,5 @@
 import pygame
+import time
 
 
 def wait_for_keypress(*keys):
