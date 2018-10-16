@@ -13,6 +13,7 @@ class ArduinoThread(threading.Thread):
 
     def __init__(self, path='/dev/ttyUSB0', baudrate=115200):
         super(ArduinoThread, self).__init__()
+        self.daemon = True
         self.should_stop = threading.Event()
         logger.info(f'Establishing connection to arduino at "{path}" with baudrate {baudrate}.')
         self.arduino = serial.Serial(path, baudrate=baudrate, timeout=1)

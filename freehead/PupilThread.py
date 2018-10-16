@@ -35,6 +35,7 @@ class PupilThread(threading.Thread):
 
     def __init__(self):
         super(PupilThread, self).__init__()
+        self.daemon = True
         self.context = zmq.Context()
 
         # open a request socket for general communication
@@ -75,9 +76,9 @@ class PupilThread(threading.Thread):
 
             if self.requesting_data_reset.is_set():
                 self.reset_request_received.set()
-                logger.info('Waiting for recording allowance')
+                logger.debug('Waiting for recording allowance')
                 self.recording_allowed.wait()
-                logger.info('Recording allowance received. Continuing.')
+                logger.debug('Recording allowance received. Continuing.')
 
             if self.i_current_sample == self.buffer_length - 1:
                 self.buffer_limit_reached = True
@@ -121,7 +122,7 @@ class PupilThread(threading.Thread):
         if self.started_running.is_set():
             self.recording_allowed.clear()
             self.requesting_data_reset.set()
-            logger.info('Waiting for reset request received signal.')
+            logger.debug('Waiting for reset request received signal.')
             self.reset_request_received.wait()
             # now the data gathering loop should wait for allowance, the data array can be reset
 
@@ -129,7 +130,7 @@ class PupilThread(threading.Thread):
         self.data = data_array
         self.i_current_sample = 0
         self.buffer_limit_reached = False
-        logger.info('Successfully reset data array.')
+        logger.debug('Successfully reset data array.')
 
         self.reset_request_received.clear()
         self.requesting_data_reset.clear()
