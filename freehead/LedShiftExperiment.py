@@ -449,7 +449,7 @@ class LedShiftExperiment:
             led_update_interval = 0.03
             for i in range(3):
                 led = 127 + int((i - i/2) * 10)
-                for j in range(0, 120, 5):
+                for j in range(0, 40):
                     self.athread.write_uint8(led, j if i==0 else 0, j if i==1 else 0, j if i == 2 else 0)
                     time.sleep(led_update_interval)
                     if fh.was_key_pressed(pygame.K_SPACE):
