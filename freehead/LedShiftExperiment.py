@@ -60,6 +60,8 @@ class LedShiftExperiment:
         block_borders = np.concatenate(([0], np.cumsum(block_lengths)))
 
         for block in self.blocks:
+            self.pause_experiment()
+
             block_dataframe = self.run_block(block)
             block_dataframe['trial_in_block'] = block_dataframe.index
             # make a new index so the trial numbers are correct when appending. trials are in random order depending on
@@ -441,6 +443,18 @@ class LedShiftExperiment:
 
         self.helmet = helmet
         print('Helmet creation done.')
+
+    def pause_experiment(self):
+        while True:
+            led_update_interval = 0.03
+            for i in range(3):
+                led = 127 + int((i - i/2) * 10)
+                for j in range(0, 120, 5):
+                    self.athread.write_uint8(led, j if i==0 else 0, j if i==1 else 0, j if i == 2 else 0)
+                    time.sleep(led_update_interval)
+                    if fh.was_key_pressed(pygame.K_SPACE):
+                        return
+            time.sleep(0.3)
 
 
 
