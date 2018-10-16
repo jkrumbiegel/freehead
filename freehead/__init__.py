@@ -20,14 +20,15 @@ from .anynan import anynan
 from .LedShiftExperiment import LedShiftExperiment
 from .qplot3d import qplot3d
 from .create_trial_frame import create_trial_frame
-from .normals_nonlinear_angular_transform import normals_nonlinear_angular_transform
+from .normals_nonlinear_angular_transform import normals_nonlinear_angular_transform, normals_nonlinear_transform
+from .was_key_pressed import was_key_pressed
 
 root = logging.getLogger('freehead')
 if not root.handlers:
-    root.setLevel(logging.DEBUG)
+    root.setLevel(logging.INFO)
 
     ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     root.addHandler(ch)
