@@ -398,17 +398,27 @@ class LedShiftExperiment:
             print('Optimization done.\n')
             print('Error: ', calibration_result.fun, '\n')
             print('Parameters: ', calibration_result.x, '\n')
+
+            # signal quality of calibration via leds
+            if calibration_result.fun <= 0.7:
+                self.athread.write_uint8(127, 0, 1, 0)  # green
+            elif 0.7 < calibration_result.fun <= 1:
+                self.athread.write_uint8(127, 1, 1, 0)  # yellow
+            else:
+                self.athread.write_uint8(127, 1, 0, 0)  # red
+
             print('Accept calibration? Yes: Space, No: Escape')
             key = fh.wait_for_keypress(pygame.K_SPACE, pygame.K_ESCAPE)
 
             if key == pygame.K_SPACE:
                 self.R_eye_head = fh.from_yawpitchroll(calibration_result.x[0:3])
                 self.nonlinear_parameters = calibration_result.x[3:9]
-                #self.helmet.ref_points[5, :] = self.helmet.ref_points[0, :] + calibration_result.x[9:12]
+                # self.helmet.ref_points[5, :] = self.helmet.ref_points[0, :] + calibration_result.x[9:12]
                 break
 
             elif key == pygame.K_ESCAPE:
                 continue
+        self.athread.write_uint8(255, 0, 0, 0)  # leds off
 
     def create_helmet(self):
         head_measurement_points = [
