@@ -339,7 +339,7 @@ class LedShiftExperiment:
 
         while True:
 
-            self.athread.write_uint8(calibration_point, 50, 0, 0)
+            self.athread.write_uint8(calibration_point, 5, 0, 0)
 
             print('Calibration pending. Press space to start.')
             fh.wait_for_keypress(pygame.K_SPACE)
