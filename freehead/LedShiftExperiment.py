@@ -162,8 +162,8 @@ class LedShiftExperiment:
         trial_successful = False
         while True:
 
-            # do calibration if c was pressed
-            if fh.was_key_pressed(pygame.K_c):
+            # do calibration if escape was pressed 
+            if fh.was_key_pressed(pygame.K_ESCAPE):
                 return TrialResult.CALIBRATE, None
 
             # check that a new pupil sample is available
