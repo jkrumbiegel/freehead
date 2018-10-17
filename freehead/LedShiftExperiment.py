@@ -434,20 +434,20 @@ class LedShiftExperiment:
 
                 if np.any(np.isnan(helmet_leds)):
                     print('Helmet LEDs not all visible. Try again.')
-                    self.athread.write_uint8(signal_led, 30, 0, 0)  # red light for failure
+                    self.athread.write_uint8(signal_led, 255, 0, 0)  # red light for failure
                     time.sleep(signal_length)
                     continue
 
                 if i == 0:
                     helmet = fh.Rigidbody(helmet_leds)
-                    self.athread.write_uint8(signal_led, 0, 30, 0)  # green light for success
+                    self.athread.write_uint8(signal_led, 0, 255, 0)  # green light for success
                     time.sleep(signal_length)
                     break
                 else:
                     _, probe_tip = fh.FourMarkerProbe().solve(current_sample[15:27].reshape((4, 3)))
                     if np.any(np.isnan(probe_tip)):
                         print('Probe not visible. Try again.')
-                        self.athread.write_uint8(signal_led, 30, 0, 0)  # red light for failure
+                        self.athread.write_uint8(signal_led, 255, 0, 0)  # red light for failure
                         time.sleep(signal_length)
                         continue
                     helmet.add_reference_points(helmet_leds, probe_tip)
@@ -460,7 +460,7 @@ class LedShiftExperiment:
                         # replace measured value with estimation
                         helmet.ref_points[5, :] = estimated_eye_position
 
-                    self.athread.write_uint8(signal_led, 0, 30, 0)  # green light for success
+                    self.athread.write_uint8(signal_led, 0, 255, 0)  # green light for success
                     time.sleep(signal_length)
                     break
 
