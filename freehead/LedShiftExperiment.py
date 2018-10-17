@@ -421,22 +421,32 @@ class LedShiftExperiment:
 
         for i, measurement_point in enumerate(head_measurement_points):
             print('Press space to measure: ' + measurement_point)
+            # light up an led to signal which measurement is going on
+            signal_led = 127 + int((i - len(head_measurement_points) / 2) * 10)
+            signal_length = 0.5
             while True:
+                self.athread.write_uint8(signal_led, 255, 255, 255)  # bright light to start and see something
                 fh.wait_for_keypress(pygame.K_SPACE)
                 current_sample = self.othread.current_sample.copy()
                 helmet_leds = current_sample[3:15].reshape((4, 3))
 
                 if np.any(np.isnan(helmet_leds)):
                     print('Helmet LEDs not all visible. Try again.')
+                    self.athread.write_uint8(signal_led, 30, 0, 0)  # red light for failure
+                    time.sleep(signal_length)
                     continue
 
                 if i == 0:
                     helmet = fh.Rigidbody(helmet_leds)
+                    self.athread.write_uint8(signal_led, 0, 30, 0)  # green light for success
+                    time.sleep(signal_length)
                     break
                 else:
                     _, probe_tip = fh.FourMarkerProbe().solve(current_sample[15:27].reshape((4, 3)))
                     if np.any(np.isnan(probe_tip)):
                         print('Probe not visible. Try again.')
+                        self.athread.write_uint8(signal_led, 30, 0, 0)  # red light for failure
+                        time.sleep(signal_length)
                         continue
                     helmet.add_reference_points(helmet_leds, probe_tip)
 
@@ -447,10 +457,14 @@ class LedShiftExperiment:
                         estimated_eye_position = helmet.ref_points[5, :] + 15 * nasion_to_inion
                         # replace measured value with estimation
                         helmet.ref_points[5, :] = estimated_eye_position
+
+                    self.athread.write_uint8(signal_led, 0, 30, 0)  # green light for success
+                    time.sleep(signal_length)
                     break
 
         self.helmet = helmet
         print('Helmet creation done.')
+        self.athread.write_uint8(255, 0, 0, 0)  # turn off leds
 
     def pause_experiment(self):
         # make three leds pulse to signal that there's currently a pause
