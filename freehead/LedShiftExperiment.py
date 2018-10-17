@@ -445,16 +445,21 @@ class LedShiftExperiment:
         print('Helmet creation done.')
 
     def pause_experiment(self):
+        # make three leds pulse to signal that there's currently a pause
+        max_brightness = 128
+        duration_cycle = 0.4
+        n_cycle_updates = 30
+        led_update_interval = duration_cycle / n_cycle_updates
         while True:
-            led_update_interval = 0.03
             for i in range(3):
-                led = 127 + int((i - i/2) * 10)
-                for j in range(0, 40):
-                    self.athread.write_uint8(led, j if i==0 else 0, j if i==1 else 0, j if i == 2 else 0)
+                led_index = 127 + int((i - i/2) * 10)
+                for brightness in (np.sin(np.linspace(0, np.pi, n_cycle_updates)) * max_brightness).astype(np.int):
+                    self.athread.write_uint8(led_index, brightness, 0, 0)
                     time.sleep(led_update_interval)
+                    # stop pause animation if space is pressed
                     if fh.was_key_pressed(pygame.K_SPACE):
                         return
-            time.sleep(0.3)
+            time.sleep(duration_cycle)
 
 
 
