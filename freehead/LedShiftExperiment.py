@@ -487,10 +487,10 @@ class LedShiftExperiment:
 
     def play_finish_animation(self):
 
-        for i in range(255):
-            led = i
-            r = i % 3
-            g = (i + 1) % 3
-            b = (i + 2) % 3
+        for i in range(1000):
+            led = np.random.randint(0, 255)
+            r = 10 if led % 3 == 0 else 0
+            g = 10 if (led + 1) % 3 == 0 else 0
+            b = 10 if (led + 2) % 3 == 0 else 0
             self.athread.write_uint8(led, r, g, b)
         self.athread.write_uint8(255, 0, 0, 0)
