@@ -375,17 +375,7 @@ class LedShiftExperiment:
 
             T_target_world = np.tile(self.rig_leds[calibration_point, :], (chosen_mask.sum(), 1))
 
-            nasion_to_inion = fh.to_unit(self.helmet.ref_points[2, :] - self.helmet.ref_points[1, :])
-            estimated_eye_position = self.helmet.ref_points[5, :] + 12 * nasion_to_inion  # go inwards 12 mm in nasion inion direction
-            ini_T_eye_head = estimated_eye_position - self.helmet.ref_points[0, :]
-
-            # calibration_result = fh.calibrate_pupil_nonlinear(
-            #     T_head_world[chosen_mask, :],
-            #     R_head_world[chosen_mask, ...],
-            #     gaze_normals[chosen_mask, ...],
-            #     T_target_world,
-            #     ini_T_eye_head=ini_T_eye_head,
-            #     leave_T_eye_head=True)
+            ini_T_eye_head = self.helmet.ref_points[5, :]
 
             calibration_result = fh.calibrate_pupil_nonlinear(
                 T_head_world[chosen_mask, ...],
@@ -449,6 +439,14 @@ class LedShiftExperiment:
                         print('Probe not visible. Try again.')
                         continue
                     helmet.add_reference_points(helmet_leds, probe_tip)
+
+                    # replace eye measurement
+                    if i == 5:
+                        nasion_to_inion = fh.to_unit(helmet.ref_points[2, :] - helmet.ref_points[1, :])
+                        # estimate eye at 15 mm inwards from probe in nasion inion direction
+                        estimated_eye_position = helmet.ref_points[5, :] + 15 * nasion_to_inion
+                        # replace measured value with estimation
+                        helmet.ref_points[5, :] = estimated_eye_position
                     break
 
         self.helmet = helmet
