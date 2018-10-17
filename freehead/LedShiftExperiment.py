@@ -73,6 +73,7 @@ class LedShiftExperiment:
             else:
                 experiment_dataframe = experiment_dataframe.append(block_dataframe)
 
+        self.play_finish_animation()
         return experiment_dataframe
 
     def run_block(self, block) -> pd.DataFrame:
@@ -483,15 +484,12 @@ class LedShiftExperiment:
                         return
             time.sleep(duration_cycle)
 
+    def play_finish_animation(self):
 
-
-
-
-
-
-
-
-
-
-
-
+        for i in range(255):
+            led = i
+            r = i % 3
+            g = (i + 1) % 3
+            b = (i + 2) % 3
+            self.athread.write_uint8(led, r, g, b)
+        self.athread.write_uint8(255, 0, 0, 0)
