@@ -377,7 +377,7 @@ class LedShiftExperiment:
 
             T_target_world = np.tile(self.rig_leds[calibration_point, :], (chosen_mask.sum(), 1))
 
-            ini_T_eye_head = self.helmet.ref_points[5, :]
+            ini_T_eye_head = self.helmet.ref_points[5, :] - self.helmet.ref_points[0, :]
 
             calibration_result = fh.calibrate_pupil_nonlinear(
                 T_head_world[chosen_mask, ...],
