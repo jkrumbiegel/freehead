@@ -310,7 +310,8 @@ class LedShiftExperiment:
         if trial_successful:
 
             trial_data = OrderedDict([
-                ('o_data', [self.othread.get_shortened_data()]), #  arrays need to be in a list so pandas doesn't try to make them long columns
+                # arrays need to be wrapped in a list so pandas doesn't try to make them long columns
+                ('o_data', [self.othread.get_shortened_data()]),
                 ('p_data', [self.pthread.get_shortened_data()]),
                 ('helmet', self.helmet),
                 ('nonlinear_parameters', [self.nonlinear_parameters]),
