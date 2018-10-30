@@ -115,9 +115,10 @@ class LedShiftExperiment:
         self.pthread.reset_data_buffer()
 
         # set up variables for one trial
-        shift = trial_frame['shift']
-        amplitude = trial_frame['amplitude']
-        fixation_led = trial_frame['fixation_led']
+        left_to_right = trial_frame['left_to_right']
+        shift = trial_frame['shift'] if left_to_right else -trial_frame['shift']
+        amplitude = trial_frame['amplitude'] if left_to_right else -trial_frame['amplitude']
+        fixation_led = trial_frame['fixation_led'] if left_to_right else 254 - trial_frame['fixation_led']
         target_led = fixation_led + amplitude
         shifted_target_led = target_led + shift
         fixation_threshold = trial_frame['fixation_threshold']
@@ -162,7 +163,7 @@ class LedShiftExperiment:
         trial_successful = False
         while True:
 
-            # do calibration if escape was pressed 
+            # do calibration if escape was pressed
             if fh.was_key_pressed(pygame.K_ESCAPE):
                 return TrialResult.CALIBRATE, None
 
@@ -188,6 +189,12 @@ class LedShiftExperiment:
                 if phase == Phase.BEFORE_FIXATION:
                     continue
                 elif phase == Phase.DURING_FIXATION:
+                    if fh.anynan(R_head_world):
+                        print('head was not visible during fixation')
+                    if fh.anynan(gaze_normals):
+                        print('nan values in gaze normals during fixation')
+                    if confidence < pupil_min_confidence:
+                        print('pupil confidence was too low during fixation')
                     phase = Phase.BEFORE_FIXATION
                     self.athread.write_uint8(fixation_led, *before_fixation_color)
                     continue
@@ -341,7 +348,7 @@ class LedShiftExperiment:
 
         while True:
 
-            self.athread.write_uint8(calibration_point, 5, 0, 0)
+            self.athread.write_uint8(calibration_point, 255, 0, 0)
 
             print('Calibration pending. Press space to start.')
             fh.wait_for_keypress(pygame.K_SPACE)
@@ -393,11 +400,11 @@ class LedShiftExperiment:
 
             # signal quality of calibration via leds
             if calibration_result.fun <= 0.7:
-                self.athread.write_uint8(127, 0, 1, 0)  # green
+                self.athread.write_uint8(127, 0, 255, 0)  # green
             elif 0.7 < calibration_result.fun <= 1:
-                self.athread.write_uint8(127, 1, 1, 0)  # yellow
+                self.athread.write_uint8(127, 255, 255, 0)  # yellow
             else:
-                self.athread.write_uint8(127, 1, 0, 0)  # red
+                self.athread.write_uint8(127, 255, 0, 0)  # red
 
             print('Accept calibration? Yes: Space, No: Escape')
             key = fh.wait_for_keypress(pygame.K_SPACE, pygame.K_ESCAPE)
@@ -424,8 +431,8 @@ class LedShiftExperiment:
         for i, measurement_point in enumerate(head_measurement_points):
             print('Press space to measure: ' + measurement_point)
             # light up an led to signal which measurement is going on
-            signal_led = 127 + int((i - len(head_measurement_points) / 2) * 10)
-            signal_length = 0.5
+            signal_led = 255
+            signal_length = 1
             while True:
                 self.athread.write_uint8(signal_led, 255, 255, 255)  # bright light to start and see something
                 fh.wait_for_keypress(pygame.K_SPACE)
@@ -470,7 +477,7 @@ class LedShiftExperiment:
 
     def pause_experiment(self):
         # make three leds pulse to signal that there's currently a pause
-        max_brightness = 128
+        max_brightness = 255
         duration_cycle = 0.4
         n_cycle_updates = 30
         led_update_interval = duration_cycle / n_cycle_updates
@@ -487,10 +494,11 @@ class LedShiftExperiment:
 
     def play_finish_animation(self):
 
-        for i in range(1000):
+        for i in range(300):
             led = np.random.randint(0, 255)
-            r = 10 if led % 3 == 0 else 0
-            g = 10 if (led + 1) % 3 == 0 else 0
-            b = 10 if (led + 2) % 3 == 0 else 0
+            r = 255 if led % 3 == 0 else 0
+            g = 255 if (led + 1) % 3 == 0 else 0
+            b = 255 if (led + 2) % 3 == 0 else 0
             self.athread.write_uint8(led, r, g, b)
+            time.sleep(0.02)
         self.athread.write_uint8(255, 0, 0, 0)
