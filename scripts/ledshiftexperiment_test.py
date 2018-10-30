@@ -20,7 +20,7 @@ athread = fh.ArduinoThread()
 athread.start()
 athread.started_running.wait()
 
-
+#%%
 probe = fh.FourMarkerProbe()
 
 def extract_probe(ot_data):
@@ -33,32 +33,30 @@ def extract_gaze(p_data):
     return p_data[3:6]
 
 if not 'rig_led_positions' in locals():
-    led_rig_indices = [0, 70, 141, 213, 254] # these are the array indices
-    probe_tips = np.full((len(led_rig_indices), 3), np.nan)
-    for i, led_rig_index in enumerate(led_rig_indices):
-        athread.write_uint8(led_rig_index, 100, 0, 0)
-        print('Press space to record led with index', led_rig_index)
+    n_rig_calib_samples = 5
+    led_positions = np.full((n_rig_calib_samples, 3), np.nan)
+    rig_calibration_indices = np.round(np.linspace(0, 254, n_rig_calib_samples)).astype(np.int)
+    
+    for i, ci in enumerate(rig_calibration_indices):
+        athread.write_uint8(ci, 100, 0, 0)
+        print('Press space to record led with index', ci)
         while True:
             fh.wait_for_keypress(pygame.K_SPACE)
-            current_sample = othread.current_sample.copy()
-            rotation, tip = probe.solve(extract_probe(current_sample))
-            if np.any(np.isnan(tip)):
+            probe_rotation, probe_tip = probe.solve(extract_probe(othread.current_sample.copy()))
+            if fh.anynan(probe_rotation):
                 print('Probe not visible, try again.')
                 continue
-            probe_tips[i, :] = tip
+            led_positions[i, :] = probe_tip[:]
             break
+          
     athread.write_uint8(255, 0, 0, 0)
     
-    led_rig_transform_result = fh.get_rig_transform(probe_tips, led_rig_indices)
-    
-    R_rig = fh.from_yawpitchroll(led_rig_transform_result.x[0:3])
-    T_rig = led_rig_transform_result.x[3:6]
-    
-    rig_led_positions = np.einsum('ij,tj->ti', R_rig, fh.LED_POSITIONS) + T_rig
+    rig = fh.LedRig(rig_calibration_indices)
+    _, rig_led_positions = rig.solve(led_positions)
 else:
     print('rig_led_positions calibration already present. Delete if you want to recalibrate.')
 
-
+#%%
 head_measurement_points = [
         'head straight',
         'nasion',
@@ -116,43 +114,26 @@ for i, c_index in enumerate(calibration_indices):
     gaze_normals[i, :] = gaze_normal
     
 athread.write_uint8(255, 0, 0, 0)
-
+#%%
 calibration_result = fh.calibrate_pupil(
         T_head_world,
         R_head_world,
         gaze_normals,
         T_target_world,
-        ini_T_eye_head = helmet.ref_points[5, :] - helmet.ref_points[0, :],
-        bounds_mm=12)
+        ini_T_eye_head = (helmet.ref_points[5, :] - helmet.ref_points[0, :])
+            + 15 * fh.to_unit(helmet.ref_points[2, :] - helmet.ref_points[1, :]), # add 15 mm of nasion to inion to measured eye position
+        bounds_mm=50)
 
 R_eye_head = fh.from_yawpitchroll(calibration_result.x[0:3])
 T_eye_head = calibration_result.x[3:6]
 
+#%%
 helmet.ref_points[5, :] = T_eye_head + helmet.ref_points[0, :]
-
-led_fixation_no_offset = 50
-led_target_no_offset = 200
-should_fix_color = (10, 0, 0)
-is_fix_color = (0, 10, 0)
-should_target_color = (0, 10, 0)
-trial_done_color = (0, 0, 10)
-fix_threshold_eye = 2
-fix_threshold_head = 5
-fixation_duration = 0.8
- 
-n_per_offset = 2
-offsets = np.arange(-5, 6) * 2
-offset_array = np.repeat(offsets, n_per_offset)
-np.random.shuffle(offset_array)
-
-fix_phase = 0
-saccade_phase = 1
-landing_phase = 2
 
 # %%
 
 settings = {
-    'trials_per_shift': 20,
+    'trials_per_shift': 2,
     'shift_magnitudes': np.arange(-5, 6) * 4,
     'default_fixation_led_index': 50,
     'default_target_led_index': 200,
@@ -162,8 +143,10 @@ settings = {
     'before_response_target_color': (0, 1, 0),
     'during_response_target_color': (0, 0, 1),
     'pupil_min_confidence': 0.25,
-    'fixation_threshold': 2,
-    'fixation_duration': 0.5,
+    'fixation_threshold': 1.5,
+    'fixation_duration': 5,
+    'fixation_head_velocity_threshold': 10,
+    'saccade_threshold': 2,
     'maximum_saccade_latency': 0.5,
     'maximum_target_reaching_duration': 0.5,
     'after_landing_fixation_threshold': 4,
