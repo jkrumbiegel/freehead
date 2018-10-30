@@ -19,4 +19,4 @@ def save_experiment_files(
 
     experiment_df.to_pickle(folder_path + subject_prefix + '_' + 'experiment_' + timestamp + '.pickle')
     trial_df.to_pickle(folder_path + subject_prefix + '_' + 'trials_' + timestamp + '.pickle')
-    np.save(folder_path + 'rig_' + subject_prefix + '_' + timestamp + '.npy', rig_leds)
+    np.save(folder_path + subject_prefix + '_' + 'rig_' + timestamp + '.npy', rig_leds)
