@@ -138,6 +138,7 @@ class LedShiftExperiment:
         maximum_target_reaching_duration = trial_frame['maximum_target_reaching_duration']
         maximum_saccade_latency = trial_frame['maximum_saccade_latency']
         after_landing_fixation_duration = trial_frame['after_landing_fixation_duration']
+        inter_trial_interval = trial_frame['inter_trial_interval']
         
         t_started_fixating = None
         i_started_fixating = None
@@ -151,6 +152,10 @@ class LedShiftExperiment:
         i_blanking_ended = None
         response = None
 
+        # turn off all leds
+        self.athread.write_uint8(255, 0, 0, 0)
+        # do the inter trial interval here, too many exit points
+        time.sleep(inter_trial_interval)
         # show the fixation led
         self.athread.write_uint8(fixation_led, *before_fixation_color)
         phase = Phase.BEFORE_FIXATION
@@ -348,10 +353,12 @@ class LedShiftExperiment:
 
         while True:
 
-            self.athread.write_uint8(calibration_point, 255, 0, 0)
+            self.athread.write_uint8(calibration_point, 128, 0, 0)
 
             print('Calibration pending. Press space to start.')
             fh.wait_for_keypress(pygame.K_SPACE)
+
+            self.athread.write_uint8(calibration_point, 255, 0, 0)
 
             self.othread.reset_data_buffer()
             self.pthread.reset_data_buffer()
