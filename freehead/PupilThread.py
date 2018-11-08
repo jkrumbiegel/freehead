@@ -25,7 +25,7 @@ class PupilThread(threading.Thread):
     last_sync_time = None
 
     buffer_length = 120 * 60 * 10  # standard number of time steps in buffer
-    sample_size = 7  # pupil time, system time corrected, system time, gaze normal x, y, z, confidence
+    sample_size = 10  # pupil time, system time corrected, system time, gaze normal x, y, z, confidence, eyecenter xyz
     sample_components = [T_PUPIL, T_SYS_REL, T_SYS_ABS, NORM_X, NORM_Y, NORM_Z, CONFIDENCE]
 
     data = None
@@ -97,7 +97,10 @@ class PupilThread(threading.Thread):
                     msg['circle_3d']['normal'][0],
                     msg['circle_3d']['normal'][1],
                     msg['circle_3d']['normal'][2],
-                    msg['confidence']
+                    msg['confidence'],
+                    msg['sphere']['center'][0],
+                    msg['sphere']['center'][1],
+                    msg['sphere']['center'][2],
                 ])
             except KeyboardInterrupt:
                 logger.warning('Keyboard Interrupt detected, closing...')
