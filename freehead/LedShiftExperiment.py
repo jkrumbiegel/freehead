@@ -22,6 +22,16 @@ class TrialResult(enum.Enum):
     FAILED = 1
     CALIBRATE = 2
 
+NORMALS = slice(2, 5)
+HELMET = slice(3, 15)
+OTIME = 30
+PTIME = 0
+CONFIDENCE = 5
+PROBE = slice(15, 27)
+I_BARY = 0
+I_NASION = 1
+I_INION = 2
+I_EYE = 3
 
 class LedShiftExperiment:
 
@@ -182,14 +192,14 @@ class LedShiftExperiment:
             last_i = current_i
             pdata = self.pthread.current_sample.copy()
 
-            gaze_normals = pdata[3:6]
-            confidence = pdata[6]
+            gaze_normals = pdata[NORMALS]
+            confidence = pdata[CONFIDENCE]
 
             odata = self.othread.current_sample.copy()
-            helmet_leds = odata[3:15].reshape((4, 3))
+            helmet_leds = odata[HELMET].reshape((4, 3))
             last_R_head_world = R_head_world
             R_head_world, helmet_ref_points = self.helmet.solve(helmet_leds)
-            T_eye_world = helmet_ref_points[5, :]
+            T_eye_world = helmet_ref_points[I_EYE, :]
 
             # if helmet rigidbody couldn't be solved or pupil data is bad
             if fh.anynan(R_head_world) or fh.anynan(gaze_normals) or (confidence < pupil_min_confidence and phase != Phase.DURING_SACCADE):
@@ -387,21 +397,21 @@ class LedShiftExperiment:
 
             odata = self.othread.get_shortened_data().copy()
             pdata = self.pthread.get_shortened_data().copy()
-            gaze_normals = pdata[:, 3:6]
+            gaze_normals = pdata[:, NORMALS]
 
-            f_interpolate = interp1d(odata[:, 30], odata[:, 3:15], axis=0, bounds_error=False, fill_value=np.nan)
-            odata_interpolated = f_interpolate(pdata[:, 2]).reshape((-1, 4, 3))
+            f_interpolate = interp1d(odata[:, OTIME], odata[:, HELMET], axis=0, bounds_error=False, fill_value=np.nan)
+            odata_interpolated = f_interpolate(pdata[:, PTIME]).reshape((-1, 4, 3))
 
             R_head_world, ref_points = self.helmet.solve(odata_interpolated)
-            T_head_world = ref_points[:, 0, :]
+            T_head_world = ref_points[:, I_BARY, :]
 
-            confidence_enough = pdata[:, 6] > 0.6
+            confidence_enough = pdata[:, CONFIDENCE] > 0.6
             rotations_valid = ~np.any(np.isnan(R_head_world).reshape((-1, 9)), axis=1)
             chosen_mask = confidence_enough & rotations_valid
 
             T_target_world = np.tile(self.rig_leds[calibration_point, :], (chosen_mask.sum(), 1))
 
-            ini_T_eye_head = self.helmet.ref_points[5, :] - self.helmet.ref_points[0, :]
+            ini_T_eye_head = self.helmet.ref_points[I_EYE, :] - self.helmet.ref_points[I_BARY, :]
 
             calibration_result = fh.calibrate_pupil_nonlinear(
                 T_head_world[chosen_mask, ...],
@@ -454,7 +464,7 @@ class LedShiftExperiment:
                 self.athread.write_uint8(signal_led, 255, 255, 255)  # bright light to start and see something
                 fh.wait_for_keypress(pygame.K_SPACE)
                 current_sample = self.othread.current_sample.copy()
-                helmet_leds = current_sample[3:15].reshape((4, 3))
+                helmet_leds = current_sample[HELMET].reshape((4, 3))
 
                 if np.any(np.isnan(helmet_leds)):
                     print('Helmet LEDs not all visible. Try again.')
@@ -462,13 +472,13 @@ class LedShiftExperiment:
                     time.sleep(signal_length)
                     continue
 
-                if i == 0:
+                if i == I_BARY:
                     helmet = fh.Rigidbody(helmet_leds)
                     self.athread.write_uint8(signal_led, 0, 255, 0)  # green light for success
                     time.sleep(signal_length)
                     break
                 else:
-                    _, probe_tip = fh.FourMarkerProbe().solve(current_sample[15:27].reshape((4, 3)))
+                    _, probe_tip = fh.FourMarkerProbe().solve(current_sample[PROBE].reshape((4, 3)))
                     if np.any(np.isnan(probe_tip)):
                         print('Probe not visible. Try again.')
                         self.athread.write_uint8(signal_led, 255, 0, 0)  # red light for failure
@@ -477,12 +487,12 @@ class LedShiftExperiment:
                     helmet.add_reference_points(helmet_leds, probe_tip)
 
                     # replace eye measurement
-                    if i == 5:
-                        nasion_to_inion = fh.to_unit(helmet.ref_points[2, :] - helmet.ref_points[1, :])
+                    if i == I_EYE:
+                        nasion_to_inion = fh.to_unit(helmet.ref_points[I_INION, :] - helmet.ref_points[I_NASION, :])
                         # estimate eye at 15 mm inwards from probe in nasion inion direction
-                        estimated_eye_position = helmet.ref_points[5, :] + 15 * nasion_to_inion
+                        estimated_eye_position = helmet.ref_points[I_EYE, :] + 15 * nasion_to_inion
                         # replace measured value with estimation
-                        helmet.ref_points[5, :] = estimated_eye_position
+                        helmet.ref_points[I_EYE, :] = estimated_eye_position
 
                     self.athread.write_uint8(signal_led, 0, 255, 0)  # green light for success
                     time.sleep(signal_length)
