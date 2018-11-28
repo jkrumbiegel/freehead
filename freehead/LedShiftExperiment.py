@@ -33,6 +33,7 @@ class LedShiftExperiment:
             rig_leds: np.ndarray,
             trial_frame: pd.DataFrame,
             calib_duration=10,
+            after_reset_wait=15
     ):
         self.trial_data = []
 
@@ -42,6 +43,7 @@ class LedShiftExperiment:
         self.rig_leds = rig_leds
         self.trial_frame = trial_frame
         self.calib_duration = calib_duration
+        self.after_reset_wait = after_reset_wait
 
         self.helmet = None
         self.R_eye_head = None
@@ -350,6 +352,14 @@ class LedShiftExperiment:
     def calibrate(self):
 
         calibration_point = 127
+
+        self.athread.write_uint8(calibration_point, 128, 0, 0)
+        print('Press space to reset eye calibration.')
+        fh.wait_for_keypress(pygame.K_SPACE)
+        self.pthread.reset_3d_eye_model()
+        self.athread.write_uint8(calibration_point, 0, 0, 128)
+
+        time.sleep(self.after_reset_wait)
 
         while True:
 
