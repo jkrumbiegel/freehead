@@ -8,25 +8,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-T_PUPIL = 't_pupil'
-T_SYS_REL = 't_sys_rel'
-T_SYS_ABS = 't_sys_abs'
-NORM_X = 'norm_x'
-NORM_Y = 'norm_y'
-NORM_Z = 'norm_z'
-CONFIDENCE = 'confidence'
-
 
 class PupilThread(threading.Thread):
 
     address = '127.0.0.1'
     request_port = '50020'
 
-    last_sync_time = None
-
-    buffer_length = 120 * 60 * 10  # standard number of time steps in buffer
-    sample_size = 10  # pupil time, system time corrected, system time, gaze normal x, y, z, confidence, eyecenter xyz
-    sample_components = [T_PUPIL, T_SYS_REL, T_SYS_ABS, NORM_X, NORM_Y, NORM_Z, CONFIDENCE]
+    buffer_length = 200 * 60 * 10 # standard number of time steps in buffer (10 minutes)
+    sample_size = 9  # pupil time, system time receipt, gaze normal x, y, z, confidence, eyecenter x, y, z
 
     data = None
     i_current_sample = 0
@@ -57,7 +46,6 @@ class PupilThread(threading.Thread):
         self.requesting_data_reset = threading.Event()
         self.reset_request_received = threading.Event()
 
-        # set the pupil timer to 0
         self.synchronize_time()
 
     def run(self):
@@ -92,7 +80,6 @@ class PupilThread(threading.Thread):
                 msg = msgpack.loads(message, encoding='utf-8')
                 self.current_sample = np.array([
                     msg['timestamp'],
-                    system_time_received - self.last_sync_time,
                     system_time_received,
                     msg['circle_3d']['normal'][0],
                     msg['circle_3d']['normal'][1],
@@ -114,10 +101,10 @@ class PupilThread(threading.Thread):
         # after loop, close sockets and context
         self.cleanup()
 
-    def synchronize_time(self, t="0.0"):
-        logger.info('Sending pupil sync signal for T= ' + t + '.')
-        self.request_socket.send_string('T ' + t)
-        self.last_sync_time = time.perf_counter()
+    def synchronize_time(self):
+        t = time.monotonic()
+        self.request_socket.send_string(f'T {t}')
+        logger.info(f'Sent pupil sync signal for T= {t}.')
         self.request_socket.recv_string()
         logger.info('Sync successful.')
 
