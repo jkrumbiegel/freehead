@@ -61,32 +61,32 @@ else:
 
 settings = {
     'left_to_right': [True, False],
-    'amplitude': [40, 70, 100, 130, 160],
-    'shift_percent_approx': [-30, -20, -10, 0, 10, 20, 30],
-    # 'fixation_led': 50,
-    'before_fixation_color': (10, 0, 0),
-    'during_fixation_color': (30, 0, 0),
-    'before_response_target_color': (30, 0, 0),
-    'during_response_target_color': (10, 0, 0),
-    'pupil_min_confidence': 0.15,
-    'fixation_threshold': 1.5,
-    'fixation_duration': 1,
-    'fixation_head_velocity_threshold': 10,
-    'saccade_threshold': 2,
-    'maximum_saccade_latency': 0.4,
-    'maximum_target_reaching_duration': 0.5,
-    'after_landing_fixation_threshold': 3,
+    'amplitude': [45, 75, 105, 135, 165],
+    'shift_percent_approx': [-300/15, -200/15, -100/15, 0, 100/15, 200/15, 300/15],
+    'before_fixation_color': (0, 10, 0),
+    'during_fixation_color': (15, 0, 0),
+    'before_response_target_color': (15, 0, 0),
+    'during_response_target_color': (0, 0, 15),
+    'pupil_min_confidence': 0,
+    'fixation_threshold': 3,
+    'fixation_duration': 0.8,
+    'fixation_head_velocity_threshold': 30,
+    'saccade_threshold': 4,
+    'maximum_saccade_latency': 0.8,
+    'maximum_target_reaching_duration': 0.8,
+    'after_landing_fixation_threshold': 5,
     'after_landing_fixation_duration': 0.5,
+    'inter_trial_interval': 0.7,
 }
 
 trial_frame = fh.create_trial_frame(
         settings,
         block_specific={
-            'blanking_duration': [0]
+            'blanking_duration': [0, 0.25]
         },
         trial_lambdas={
             'shift': lambda df: int(df['amplitude'] * df['shift_percent_approx'] / 100),
-            'fixation_led': lambda df: 22 + np.random.randint(-20, 21)
+            'fixation_led': lambda df: 22 + np.random.randint(-15, 16)
         })
 
 print('left-most led:', trial_frame['fixation_led'].min())
