@@ -149,12 +149,3 @@ class PupilThread(threading.Thread):
         else:
             return self.data[0:self.i_current_sample, :]
 
-    def get_last_angular_velocity(self):
-        n_samples = self.i_current_sample
-        if n_samples > 1:
-            angular_velocity = np.rad2deg(np.arccos(np.dot(
-                self.data.values[n_samples - 1, 3:6],
-                self.data.values[n_samples - 2, 3:6]))) * 120
-            return angular_velocity
-        else:
-            return 0
