@@ -139,6 +139,7 @@ class LedShiftExperiment:
 
         self.othread.reset_data_buffer()
         self.pthread.reset_data_buffer()
+        self.athread.reset_command_timestamps()
 
         # set up variables for one trial
         left_to_right = trial_frame['left_to_right']
@@ -176,6 +177,8 @@ class LedShiftExperiment:
         i_saccade_landed = None
         t_blanking_ended = None
         i_blanking_ended = None
+        i_led_shift_done = None
+        i_target_turned_off = None
         response = None
 
         # turn off all leds
@@ -306,9 +309,9 @@ class LedShiftExperiment:
                     i_saccade_started = current_i
                     t_saccade_started = time.monotonic()
                     if blanking_duration == 0:
-                        self.athread.write_uint8(shifted_target_led, *before_response_target_color)
+                        i_led_shift_done = self.athread.write_uint8(shifted_target_led, *before_response_target_color)
                     else:
-                        self.athread.write_uint8(255, 0, 0, 0)
+                        i_target_turned_off = self.athread.write_uint8(255, 0, 0, 0)
 
                     phase = Phase.DURING_SACCADE
 
@@ -318,7 +321,7 @@ class LedShiftExperiment:
                     if t_blanking_ended is None:
                         t_blanking_ended = time.monotonic()
                         i_blanking_ended = current_i
-                        self.athread.write_uint8(shifted_target_led, *before_response_target_color)
+                        i_led_shift_done = self.athread.write_uint8(shifted_target_led, *before_response_target_color)
 
                     if time.monotonic() - t_blanking_ended > maximum_target_reaching_duration:
                         print('maximum target reaching duration was exceeded')
@@ -377,6 +380,8 @@ class LedShiftExperiment:
                 ('i_saccade_landed', i_saccade_landed),
                 ('i_blanking_ended', i_blanking_ended),
                 ('t_blanking_ended', t_blanking_ended),
+                ('t_led_shift_done', self.athread.command_timestamps[i_led_shift_done]),
+                ('t_target_turned_off', self.athread.command_timestamps[i_target_turned_off] if blanking_duration > 0 else None),
                 ('response', response),
             ])
 
