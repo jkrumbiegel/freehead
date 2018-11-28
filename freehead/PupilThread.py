@@ -121,6 +121,13 @@ class PupilThread(threading.Thread):
         self.request_socket.recv_string()
         logger.info('Sync successful.')
 
+    def reset_3d_eye_model(self):
+        self.request_socket.send_string('notify.detector3d.reset_model', flags=zmq.SNDMORE)
+        self.request_socket.send(msgpack.dumps({
+            'subject': 'detector3d.reset_model'
+        }))
+        return self.request_socket.recv_string()
+
     def reset_data_buffer(self):
         if self.started_running.is_set():
             self.recording_allowed.clear()
