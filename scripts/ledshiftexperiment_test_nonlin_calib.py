@@ -22,6 +22,7 @@ athread.started_running.wait()
 
 #%%
 probe = fh.FourMarkerProbe()
+fh.focus_pygame_window()
 
 def extract_probe(ot_data):
     return ot_data[..., 15:27].reshape((-1, 4, 3)).squeeze()
@@ -93,7 +94,7 @@ print('right-most led:', (trial_frame['amplitude'] + trial_frame['shift'] + tria
 print('number of trials:', len(trial_frame))
 #%%
 subject_prefix = input('Subject prefix: ')
-print('Remember to select the pygame window')
+fh.focus_pygame_window()
 experiment = fh.LedShiftExperiment(othread, pthread, athread, rig_led_positions, trial_frame)
 experiment_df = experiment.run() 
 
