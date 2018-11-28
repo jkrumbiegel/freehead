@@ -21,6 +21,7 @@ class TrialResult(enum.Enum):
     COMPLETED = 0
     FAILED = 1
     CALIBRATE = 2
+    QUIT_EXPERIMENT = 3
 
 NORMALS = slice(2, 5)
 HELMET = slice(3, 15)
@@ -62,7 +63,7 @@ class LedShiftExperiment:
         self.blocks = self.trial_frame['block'].unique()
         self.remaining_trials = np.arange(len(self.trial_frame))
 
-    def run(self) -> pd.DataFrame:
+    def run(self) -> Optional[pd.DataFrame]:
 
         self.create_helmet()
         self.calibrate()
@@ -71,24 +72,35 @@ class LedShiftExperiment:
         block_lengths = self.trial_frame['block'].value_counts(sort=False).values
         block_borders = np.concatenate(([0], np.cumsum(block_lengths)))
 
-        for block in self.blocks:
+        for block, block_length in zip(self.blocks, block_lengths):
             self.pause_experiment()
 
             block_dataframe = self.run_block(block)
+
+            if block_dataframe is None:
+                # block was quit prematurely
+                # return experiment dataframe in it's current state
+                return experiment_dataframe
+
             block_dataframe['trial_in_block'] = block_dataframe.index
             # make a new index so the trial numbers are correct when appending. trials are in random order depending on
             # when they were successfully finished
-            block_dataframe.index = pd.Series(np.arange(block_borders[block], block_borders[block + 1]))
+            block_dataframe.index = pd.Series(np.arange(block_borders[block], block_borders[block] + len(block_dataframe)))
 
             if experiment_dataframe is None:
                 experiment_dataframe = block_dataframe
             else:
                 experiment_dataframe = experiment_dataframe.append(block_dataframe)
 
+            if len(block_dataframe) < block_length:
+                # block was quit prematurely, with some, but not all, trials being done
+                # quit experiment
+                return experiment_dataframe
+
         self.play_finish_animation()
         return experiment_dataframe
 
-    def run_block(self, block) -> pd.DataFrame:
+    def run_block(self, block) -> Optional[pd.DataFrame]:
         block_frame = self.trial_frame[self.trial_frame['block'] == block]
         remaining_block_trials = block_frame.index.values
         block_dataframe = None
@@ -118,6 +130,8 @@ class LedShiftExperiment:
             elif trial_result == TrialResult.CALIBRATE:
                 self.create_helmet()
                 self.calibrate()
+            elif trial_result == TrialResult.QUIT_EXPERIMENT:
+                break
 
         return block_dataframe
 
@@ -181,8 +195,20 @@ class LedShiftExperiment:
         while True:
 
             # do calibration if escape was pressed
-            if fh.was_key_pressed(pygame.K_ESCAPE):
+            escape_pressed, backspace_pressed = fh.was_key_pressed(pygame.K_ESCAPE, pygame.K_BACKSPACE)
+            if escape_pressed:
                 return TrialResult.CALIBRATE, None
+
+            if backspace_pressed:
+                self.athread.write_uint8(255, 128, 0, 0)
+                key = fh.wait_for_keypress(pygame.K_ESCAPE, pygame.K_SPACE)
+                if key == pygame.K_ESCAPE:
+                    return TrialResult.FAILED, None
+                else:
+                    self.athread.write_uint8(255, 0, 128, 0)
+                    time.sleep(0.5)
+                    self.athread.write_uint8(255, 0, 0, 0)
+                    return TrialResult.QUIT_EXPERIMENT, None
 
             # check that a new pupil sample is available
             current_i = self.pthread.i_current_sample
