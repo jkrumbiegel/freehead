@@ -451,8 +451,6 @@ class LedShiftExperiment:
             'head straight',
             'nasion',
             'inion',
-            'right ear',
-            'left ear',
             'right eye']
 
         for i, measurement_point in enumerate(head_measurement_points):
