@@ -23,6 +23,7 @@ from .create_trial_frame import create_trial_frame
 from .normals_nonlinear_angular_transform import normals_nonlinear_angular_transform, normals_nonlinear_transform
 from .was_key_pressed import was_key_pressed
 from .save_experiment_files import save_experiment_files
+from .focus_pygame_window import focus_pygame_window
 
 root = logging.getLogger('freehead')
 if not root.handlers:
