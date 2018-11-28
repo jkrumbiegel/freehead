@@ -112,21 +112,3 @@ athread.should_stop.set()
 athread.join()
 
 print('done')
-
-# %%
-#data = {
-#    'trial_data': experiment.trial_data,
-#    'settings': settings,
-#    'trial_matrix': experiment.trial_matrix,
-#    'R_eye_head': R_eye_head,
-#    'rig_leds': rig_led_positions,
-#    'helmet_ref_markers': helmet.reference_markers,
-#    'helmet_ref_points': helmet.ref_points,
-#}
-#
-#identifier = 'led_shift_experiment'
-#date = datetime.strftime(datetime.now(), '%Y-%m-%d_%H-%M-%S')
-#filename = identifier + '_' + date +  '.pickle'
-#with open(filename, 'wb') as f:
-#    pickle.dump(data, f)
-
