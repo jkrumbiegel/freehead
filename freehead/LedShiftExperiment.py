@@ -190,7 +190,7 @@ class LedShiftExperiment:
             T_eye_world = helmet_ref_points[5, :]
 
             # if helmet rigidbody couldn't be solved or pupil data is bad
-            if fh.anynan(R_head_world) or fh.anynan(gaze_normals) or confidence < pupil_min_confidence:
+            if fh.anynan(R_head_world) or fh.anynan(gaze_normals) or (confidence < pupil_min_confidence and phase != Phase.DURING_SACCADE):
                 if phase == Phase.BEFORE_FIXATION:
                     continue
                 elif phase == Phase.DURING_FIXATION:
