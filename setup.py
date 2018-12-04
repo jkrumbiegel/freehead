@@ -15,5 +15,7 @@ setup(
         'msgpack',
         'pyyaml',
         'pygame',
+        'pyserial',
+        'numba',
     ],
     zip_safe=False)
