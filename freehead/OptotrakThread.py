@@ -169,6 +169,7 @@ class OptotrakThread(threading.Thread):
                 self.data[self.i_current_sample, :] = self.current_sample
 
             self.i_current_sample += 1
+            time.sleep(0.001)
 
         self.cleanup()
 

@@ -39,7 +39,7 @@ class ArduinoThread(threading.Thread):
 
                 # before the next one a ready signal needs to be read
                 while not self.should_stop.is_set() and self.arduino.read() == b'':
-                    time.sleep(0)
+                    time.sleep(0.0005)
 
                 # when the return message has been received, a timestamp is appended to be retrieved later
                 self.command_timestamps.append(time.monotonic())
@@ -48,7 +48,7 @@ class ArduinoThread(threading.Thread):
                 continue
 
             # if there is no command waiting, control is given away if possible
-            time.sleep(0)
+            time.sleep(0.0005)
 
         logger.info('Closing arduino.')
         self.arduino.close()

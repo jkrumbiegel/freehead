@@ -96,7 +96,11 @@ print('number of trials:', len(trial_frame))
 subject_prefix = input('Subject prefix: ')
 fh.focus_pygame_window()
 experiment = fh.LedShiftExperiment(othread, pthread, athread, rig_led_positions, trial_frame)
-experiment_df = experiment.run() 
+
+sys.setswitchinterval(0.0001)
+experiment_df = experiment.run()
+sys.setswitchinterval(0.005)
+
 
 #%%
 fh.save_experiment_files(experiment_df, trial_frame, rig_led_positions, subject_prefix)

@@ -216,7 +216,7 @@ class LedShiftExperiment:
             # check that a new pupil sample is available
             current_i = self.pthread.i_current_sample
             if current_i == last_i:
-                time.sleep(0)
+                time.sleep(0.0005)
                 continue
             last_i = current_i
             pdata = self.pthread.current_sample.copy()
