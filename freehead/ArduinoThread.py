@@ -35,7 +35,7 @@ class ArduinoThread(threading.Thread):
 
             if len(self.queue):
                 self.arduino.write(self.queue.popleft())
-                logger.info('Command sent')
+                logger.debug('Command sent')
 
                 # before the next one a ready signal needs to be read
                 while not self.should_stop.is_set() and self.arduino.read() == b'':

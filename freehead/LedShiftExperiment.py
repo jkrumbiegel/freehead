@@ -151,7 +151,7 @@ class LedShiftExperiment:
         fixation_threshold = trial_frame['fixation_threshold']
         fixation_head_velocity_threshold = trial_frame['fixation_head_velocity_threshold']
         saccade_threshold = trial_frame['saccade_threshold']
-        after_landing_fixation_threshold = trial_frame['after_landing_fixation_threshold']
+        landing_fixation_threshold = trial_frame['landing_fixation_threshold']
 
         pupil_min_confidence = trial_frame['pupil_min_confidence']
 
@@ -259,12 +259,19 @@ class LedShiftExperiment:
                 )
             ) * self.othread.server_config['optotrak']['collection_frequency']
 
+            def is_eye_within_led_threshold(led, threshold):
+                eye_to_led = fh.to_unit(self.rig_leds[led, :] - T_eye_world)
+                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(
+                    self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
+                eye_to_led_azim_elev = np.rad2deg(
+                    np.abs(fh.to_azim_elev(gaze_normals_world) - fh.to_azim_elev(eye_to_led)))
+                # threshold is only horizontal right now because of increased vertical angle noise and spikes
+                is_within_threshold = eye_to_led_azim_elev[0] <= threshold
+                return is_within_threshold
+
             if phase == Phase.BEFORE_FIXATION:
 
-                eye_to_fixpoint = fh.to_unit(self.rig_leds[fixation_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
-                eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
-                is_fixating = eye_to_fixpoint_angle <= fixation_threshold
+                is_fixating = is_eye_within_led_threshold(fixation_led, fixation_threshold)
                 is_holding_still = current_head_angular_velocity <= fixation_head_velocity_threshold
 
                 if is_fixating and is_holding_still:
@@ -275,10 +282,7 @@ class LedShiftExperiment:
 
             elif phase == Phase.DURING_FIXATION:
 
-                eye_to_fixpoint = fh.to_unit(self.rig_leds[fixation_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
-                eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
-                is_fixating = eye_to_fixpoint_angle <= fixation_threshold
+                is_fixating = is_eye_within_led_threshold(fixation_led, fixation_threshold)
                 is_holding_still = current_head_angular_velocity <= fixation_head_velocity_threshold
 
                 if not (is_fixating and is_holding_still):
@@ -300,10 +304,7 @@ class LedShiftExperiment:
                     print('maximum saccade latency exceeded')
                     break
 
-                eye_to_fixpoint = fh.to_unit(self.rig_leds[fixation_led, :] - T_eye_world)
-                gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
-                eye_to_fixpoint_angle = np.rad2deg(np.arccos(eye_to_fixpoint @ gaze_normals_world))
-                has_started_saccade = eye_to_fixpoint_angle > saccade_threshold
+                has_started_saccade = not is_eye_within_led_threshold(fixation_led, saccade_threshold)
 
                 if has_started_saccade:
                     i_saccade_started = current_i
@@ -327,12 +328,7 @@ class LedShiftExperiment:
                         print('maximum target reaching duration was exceeded')
                         break
 
-                    eye_to_shifted_target = fh.to_unit(self.rig_leds[shifted_target_led, :] - T_eye_world)
-                    gaze_normals_world = R_head_world @ fh.normals_nonlinear_angular_transform(
-                        self.R_eye_head @ gaze_normals, self.nonlinear_parameters)
-                    eye_to_shifted_target_angle = np.rad2deg(
-                        np.arccos(eye_to_shifted_target @ gaze_normals_world))
-                    is_fixating_target = eye_to_shifted_target_angle <= fixation_threshold
+                    is_fixating_target = is_eye_within_led_threshold(shifted_target_led, landing_fixation_threshold)
 
                     if is_fixating_target:
                         i_saccade_landed = current_i
@@ -347,17 +343,6 @@ class LedShiftExperiment:
                     response = 'left' if response_key == pygame.K_LEFT else 'right'
                     trial_successful = True
                     break
-
-                # this part might have been triggered to easily, leave it out (target only has to be reached once)
-
-                # eye_to_shifted_target = fh.to_unit(self.rig_leds[shifted_target_led, :] - T_eye_world)
-                # gaze_normals_world = R_head_world @ self.R_eye_head @ gaze_normals
-                # eye_to_shifted_target_angle = np.rad2deg(np.arccos(eye_to_shifted_target @ gaze_normals_world))
-                # is_fixating_target_after_landing = eye_to_shifted_target_angle <= after_landing_fixation_threshold
-                #
-                # if not is_fixating_target_after_landing:
-                #     print('landing target was not properly fixated')
-                #     break
 
         # sampling loop over
         if trial_successful:

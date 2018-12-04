@@ -1,9 +1,7 @@
 import freehead as fh
 import numpy as np
 import pygame
-import os
-import pickle
-from datetime import datetime
+import sys
 #%%
 pygame.init()
 pygame.display.set_mode((300, 300))
@@ -24,16 +22,12 @@ athread.started_running.wait()
 probe = fh.FourMarkerProbe()
 fh.focus_pygame_window()
 
+
 def extract_probe(ot_data):
     return ot_data[..., 15:27].reshape((-1, 4, 3)).squeeze()
 
-def extract_helmet(ot_data):
-    return ot_data[..., 3:15].reshape((-1, 4, 3)).squeeze()
 
-def extract_gaze(p_data):
-    return p_data[3:6]
-
-if not 'rig_led_positions' in locals():
+if 'rig_led_positions' not in locals():
     n_rig_calib_samples = 5
     led_positions = np.full((n_rig_calib_samples, 3), np.nan)
     rig_calibration_indices = np.round(np.linspace(0, 254, n_rig_calib_samples)).astype(np.int)
@@ -63,18 +57,18 @@ settings = {
     'left_to_right': [True, False],
     'amplitude': [45, 75, 105, 135, 165],
     'shift_percent_approx': [-300/15, -200/15, -100/15, 0, 100/15, 200/15, 300/15],
-    'before_fixation_color': (0, 10, 0),
-    'during_fixation_color': (15, 0, 0),
-    'before_response_target_color': (15, 0, 0),
+    'before_fixation_color': (0, 15, 0),
+    'during_fixation_color': (25, 0, 0),
+    'before_response_target_color': (25, 0, 0),
     'during_response_target_color': (0, 0, 15),
     'pupil_min_confidence': 0,
-    'fixation_threshold': 3,
+    'fixation_threshold': 2,
     'fixation_duration': 0.8,
     'fixation_head_velocity_threshold': 30,
-    'saccade_threshold': 4,
+    'saccade_threshold': 2,
     'maximum_saccade_latency': 0.8,
     'maximum_target_reaching_duration': 0.8,
-    'after_landing_fixation_threshold': 5,
+    'landing_fixation_threshold': 5,
     'after_landing_fixation_duration': 0.5,
     'inter_trial_interval': 0.7,
 }
@@ -117,3 +111,12 @@ athread.should_stop.set()
 athread.join()
 
 print('done')
+
+#%%
+import matplotlib.pyplot as plt
+def plot_trial(i):
+    t = experiment_df.iloc[i]
+    fig, axes = plt.subplots(2, 1)
+    aa = axes.flat
+
+    aa[0].plot(t['p_data'][:, 1] - t['p_data'][:, 0])
