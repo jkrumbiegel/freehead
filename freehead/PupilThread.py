@@ -46,7 +46,8 @@ class PupilThread(threading.Thread):
         self.requesting_data_reset = threading.Event()
         self.reset_request_received = threading.Event()
 
-        self.synchronize_time()
+        # no need for synchronization now that pupil sends only time.monotonic()
+        # self.synchronize_time()
 
     def run(self):
 
@@ -97,6 +98,7 @@ class PupilThread(threading.Thread):
                 self.data[self.i_current_sample, :] = self.current_sample
 
             self.i_current_sample += 1
+            time.sleep(0.001)
 
         # after loop, close sockets and context
         self.cleanup()
