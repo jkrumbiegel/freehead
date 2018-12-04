@@ -2,12 +2,14 @@ import freehead as fh
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 
+sys.setswitchinterval(0.0001)
 pthread = fh.PupilThread()
 pthread.start()
 pthread.started_running.wait()
 
-for i in range(15):
+for i in range(10):
     time.sleep(1)
     print(i + 1)
     
