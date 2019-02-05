@@ -23,6 +23,7 @@ class TrialResult(enum.Enum):
     CALIBRATE = 2
     QUIT_EXPERIMENT = 3
 
+
 NORMALS = slice(2, 5)
 HELMET = slice(3, 15)
 OTIME = 30
@@ -33,6 +34,7 @@ I_BARY = 0
 I_NASION = 1
 I_INION = 2
 I_EYE = 3
+
 
 class LedShiftExperiment:
 
@@ -65,6 +67,7 @@ class LedShiftExperiment:
 
     def run(self) -> Optional[pd.DataFrame]:
 
+        t_start = time.monotonic()
         self.create_helmet()
         self.calibrate()
 
@@ -98,6 +101,12 @@ class LedShiftExperiment:
                 return experiment_dataframe
 
         self.play_finish_animation()
+
+        t_end = time.monotonic()
+        duration = (t_end - t_start)
+        print(f'{len(experiment_dataframe)} trials finished in {duration / 60:.1f} minutes'
+              f' ({duration / len(experiment_dataframe):.1f} seconds per trial average)')
+
         return experiment_dataframe
 
     def run_block(self, block) -> Optional[pd.DataFrame]:
@@ -399,8 +408,6 @@ class LedShiftExperiment:
             self.othread.reset_data_buffer()
             self.pthread.reset_data_buffer()
 
-            # show calibration led
-
             print('\nCalibration starting.\n')
 
             start_time = time.monotonic()
@@ -445,7 +452,7 @@ class LedShiftExperiment:
             if calibration_result.fun <= 0.7:
                 self.athread.write_uint8(127, 0, 255, 0)  # green
             elif 0.7 < calibration_result.fun <= 1:
-                self.athread.write_uint8(127, 255, 255, 0)  # yellow
+                self.athread.write_uint8(127, 255, 128, 0)  # yellow
             else:
                 self.athread.write_uint8(127, 255, 0, 0)  # red
 

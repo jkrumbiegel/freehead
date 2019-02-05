@@ -2,7 +2,7 @@ import freehead as fh
 import numpy as np
 import pygame
 import sys
-#%%
+#%% initialize background threads
 pygame.init()
 pygame.display.set_mode((300, 300))
 
@@ -18,7 +18,7 @@ athread = fh.ArduinoThread()
 athread.start()
 athread.started_running.wait()
 
-#%%
+#%% record led rig
 probe = fh.FourMarkerProbe()
 fh.focus_pygame_window()
 
@@ -68,7 +68,7 @@ settings = {
     'saccade_threshold': 2,
     'maximum_saccade_latency': 0.8,
     'maximum_target_reaching_duration': 0.8,
-    'landing_fixation_threshold': 5,
+    'landing_fixation_threshold': 3,
     'after_landing_fixation_duration': 0.5,
     'inter_trial_interval': 0.7,
 }
@@ -76,7 +76,7 @@ settings = {
 trial_frame = fh.create_trial_frame(
         settings,
         block_specific={
-            'blanking_duration': [0, 0.25]
+            'blanking_duration': [0, 0.25] * 4
         },
         trial_lambdas={
             'shift': lambda df: int(df['amplitude'] * df['shift_percent_approx'] / 100),
@@ -95,10 +95,8 @@ sys.setswitchinterval(0.0001)
 experiment_df = experiment.run()
 sys.setswitchinterval(0.005)
 
-
-#%%
 fh.save_experiment_files(experiment_df, trial_frame, rig_led_positions, subject_prefix)
-# %%        
+
 othread.should_stop.set()
 othread.join()
 
@@ -111,12 +109,3 @@ athread.should_stop.set()
 athread.join()
 
 print('done')
-
-#%%
-import matplotlib.pyplot as plt
-def plot_trial(i):
-    t = experiment_df.iloc[i]
-    fig, axes = plt.subplots(2, 1)
-    aa = axes.flat
-
-    aa[0].plot(t['p_data'][:, 1] - t['p_data'][:, 0])
