@@ -9,4 +9,10 @@ def to_azim_elev(vectors):
     :return:
     """
 
-    return np.arctan2(vectors[..., [0, 2]], vectors[..., 1, None])
+    azimuth = np.arctan2(vectors[..., 1], vectors[..., 0])
+    elevation = np.arctan2(vectors[..., 2], np.sqrt((vectors[..., 1] ** 2) + (vectors[..., 0] ** 2)))
+
+    if vectors.ndim == 1:
+        return np.array([azimuth, elevation])
+    else:
+        return np.stack((azimuth, elevation), axis=-1)
