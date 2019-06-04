@@ -22,6 +22,7 @@ class TrialResult(enum.Enum):
     FAILED = 1
     CALIBRATE = 2
     QUIT_EXPERIMENT = 3
+    EYE_CALIBRATE = 4
 
 
 NORMALS = slice(2, 5)
@@ -76,7 +77,7 @@ class LedShiftExperiment:
         block_borders = np.concatenate(([0], np.cumsum(block_lengths)))
 
         for block, block_length in zip(self.blocks, block_lengths):
-            self.pause_experiment()
+            self.pause_experiment(nleds=block + 1)  # show block number through number of leds blinking
 
             block_dataframe = self.run_block(block)
 
@@ -139,6 +140,10 @@ class LedShiftExperiment:
             elif trial_result == TrialResult.CALIBRATE:
                 self.create_helmet()
                 self.calibrate()
+
+            elif trial_result == TrialResult.EYE_CALIBRATE:
+                self.calibrate()
+
             elif trial_result == TrialResult.QUIT_EXPERIMENT:
                 break
 
@@ -207,9 +212,13 @@ class LedShiftExperiment:
         while True:
 
             # do calibration if escape was pressed
-            escape_pressed, backspace_pressed = fh.was_key_pressed(pygame.K_ESCAPE, pygame.K_BACKSPACE)
+            escape_pressed, backspace_pressed, kp_enter_pressed = fh.was_key_pressed(
+                pygame.K_ESCAPE, pygame.K_BACKSPACE, pygame.K_KP_ENTER)
             if escape_pressed:
                 return TrialResult.CALIBRATE, None
+
+            if kp_enter_pressed:
+                return TrialResult.EYE_CALIBRATE, None
 
             if backspace_pressed:
                 self.athread.write_uint8(255, 128, 0, 0)
@@ -428,7 +437,7 @@ class LedShiftExperiment:
             R_head_world, ref_points = self.helmet.solve(odata_interpolated)
             T_head_world = ref_points[:, I_BARY, :]
 
-            confidence_enough = pdata[:, CONFIDENCE] > 0.6
+            confidence_enough = pdata[:, CONFIDENCE] > 0.3
             rotations_valid = ~np.any(np.isnan(R_head_world).reshape((-1, 9)), axis=1)
             chosen_mask = confidence_enough & rotations_valid
 
@@ -523,22 +532,22 @@ class LedShiftExperiment:
         print('Helmet creation done.')
         self.athread.write_uint8(255, 0, 0, 0)  # turn off leds
 
-    def pause_experiment(self):
+    def pause_experiment(self, nleds=3, led_distance=5):
         # make three leds pulse to signal that there's currently a pause
         max_brightness = 255
-        duration_cycle = 0.4
-        n_cycle_updates = 30
+        duration_cycle = 0.35
+        n_cycle_updates = 25
         led_update_interval = duration_cycle / n_cycle_updates
         while True:
-            for i in range(3):
-                led_index = 127 + int((i - i/2) * 10)
+            for i in range(nleds):
+                led_index = 127 + int((i - (nleds - 1) / 2) * led_distance)
                 for brightness in (np.sin(np.linspace(0, np.pi, n_cycle_updates)) * max_brightness).astype(np.int):
                     self.athread.write_uint8(led_index, brightness, 0, 0)
                     time.sleep(led_update_interval)
                     # stop pause animation if space is pressed
                     if fh.was_key_pressed(pygame.K_SPACE):
                         return
-            time.sleep(duration_cycle)
+            time.sleep(duration_cycle * 3)
 
     def play_finish_animation(self):
 

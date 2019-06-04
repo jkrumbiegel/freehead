@@ -3,7 +3,8 @@ import numpy as np
 import pygame
 import sys
 #%% initialize background threads
-pygame.init()
+# pygame.init()
+pygame.display.init()
 pygame.display.set_mode((300, 300))
 
 othread = fh.OptotrakThread()
@@ -76,11 +77,12 @@ settings = {
 trial_frame = fh.create_trial_frame(
         settings,
         block_specific={
-            'blanking_duration': [0, 0.25] * 4
+            # 'blanking_duration': [0, 0.25] * 4  # no blank first
+            'blanking_duration': [0.25, 0] * 4  # blank first
         },
         trial_lambdas={
             'shift': lambda df: int(df['amplitude'] * df['shift_percent_approx'] / 100),
-            'fixation_led': lambda df: 22 + np.random.randint(-15, 16)
+            'fixation_led': lambda df: 38 + np.random.randint(0, 10)
         })
 
 print('left-most led:', trial_frame['fixation_led'].min())
@@ -97,13 +99,13 @@ sys.setswitchinterval(0.005)
 
 fh.save_experiment_files(experiment_df, trial_frame, rig_led_positions, subject_prefix)
 
+pygame.quit()
+
 othread.should_stop.set()
 othread.join()
 
 pthread.should_stop.set()
 pthread.join()
-
-pygame.quit()
 
 athread.should_stop.set()
 athread.join()
