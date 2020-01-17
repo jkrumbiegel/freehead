@@ -1,8 +1,9 @@
-import pygame
 import time
 
 
 def wait_for_keypress(*keys):
+    import pygame
+
     # flush events first so old keypresses don't count
     pygame.event.clear()
     key_detected = False

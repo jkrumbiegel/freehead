@@ -53,7 +53,7 @@ def expand_df_arrays(df, array_lambdas, scalar_lambdas, index_columns):
 
         for i_row, row in df.iterrows():
             result = lambd(row)
-            if row_counts and result.shape[0] != row_counts[i_row]:
+            if row_counts is not None and result.shape[0] != row_counts[i_row]:
                 raise Exception(
                     f'Array resulting from row {i_row} in column {name} needs length {row_counts[i_row]}'
                     f'but has {result.shape[0]}.')
@@ -62,7 +62,7 @@ def expand_df_arrays(df, array_lambdas, scalar_lambdas, index_columns):
         if row_counts is None:
             # record row counts for first column
             # these are later used to repeat scalars as often as necessary for each array
-            row_counts = [result.shape[0] for result in results]
+            row_counts = pd.Series([result.shape[0] for result in results], index=df.index)
 
         result = np.concatenate(results)
 

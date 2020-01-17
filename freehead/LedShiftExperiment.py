@@ -2,7 +2,6 @@ import freehead as fh
 import numpy as np
 import time
 import enum
-import pygame
 import pandas as pd
 from collections import OrderedDict
 from scipy.interpolate import interp1d
@@ -49,6 +48,8 @@ class LedShiftExperiment:
             calib_duration=10,
             after_reset_wait=15
     ):
+        import pygame
+
         self.trial_data = []
 
         self.othread = othread

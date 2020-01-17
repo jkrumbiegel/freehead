@@ -27,10 +27,13 @@ from .expand_df_arrays import expand_df_arrays
 from .array_apply import array_apply
 from .padded_diff import padded_diff
 from .sacc_dec_engb_merg import sacc_dec_engb_merg
+from .sacc_dec_engb_merg_horizontal import sacc_dec_engb_merg_horizontal
 from .to_azim_elev import to_azim_elev
 from .interpolate_a_onto_b_time import interpolate_a_onto_b_time
 from .save_experiment_files import save_experiment_files
 from .focus_pygame_window import focus_pygame_window
+from .load_combined_session_dfs import load_combined_session_dfs
+from .expand_array_df import expand_array_df
 
 PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
